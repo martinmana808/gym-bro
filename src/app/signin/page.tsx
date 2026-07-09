@@ -6,11 +6,13 @@ export default async function SignInPage() {
   if (session?.user) redirect("/workouts");
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-8 px-6">
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col items-center justify-center gap-10 px-6">
       <div className="text-center">
-        <p className="text-5xl">🏋️</p>
-        <h1 className="mt-4 text-4xl font-bold">Gym Bro</h1>
-        <p className="mt-2 text-zinc-400">Your workout routine, tracked set by set.</p>
+        <p className="text-6xl">🏋️</p>
+        <h1 className="mt-5 text-5xl font-black tracking-tight">
+          Gym <span className="text-lime-400">Bro</span>
+        </h1>
+        <p className="mt-3 text-lg text-zinc-400">Your workout routine, tracked set by set.</p>
       </div>
 
       <div className="flex w-full flex-col gap-3">
@@ -21,7 +23,7 @@ export default async function SignInPage() {
               await signIn("google", { redirectTo: "/workouts" });
             }}
           >
-            <button className="w-full rounded-xl bg-zinc-100 py-3 font-semibold text-zinc-950 hover:bg-white">
+            <button className="w-full rounded-2xl bg-zinc-100 py-3.5 font-bold text-zinc-950 transition hover:bg-white active:scale-[0.98]">
               Continue with Google
             </button>
           </form>
@@ -33,7 +35,7 @@ export default async function SignInPage() {
               await signIn("dev", { redirectTo: "/workouts" });
             }}
           >
-            <button className="w-full rounded-xl border border-zinc-700 py-3 font-semibold text-zinc-200 hover:border-lime-400 hover:text-lime-400">
+            <button className="w-full rounded-2xl border border-zinc-700 py-3.5 font-semibold text-zinc-200 transition hover:border-lime-400 hover:text-lime-400 active:scale-[0.98]">
               Dev login (local only)
             </button>
           </form>

@@ -29,8 +29,8 @@ const emptyExercise = (): ExerciseDraft => ({
 });
 
 const field =
-  "w-full rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-zinc-100 " +
-  "placeholder:text-zinc-500 focus:border-lime-400 focus:outline-none";
+  "w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2.5 text-zinc-100 " +
+  "placeholder:text-zinc-600 transition focus:border-lime-400 focus:outline-none";
 
 export function WorkoutBuilder({
   workoutId,
@@ -120,9 +120,12 @@ export function WorkoutBuilder({
       </label>
 
       {blocks.map((block, bi) => (
-        <section key={block.key} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+        <section
+          key={block.key}
+          className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4"
+        >
           <header className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-semibold uppercase tracking-wide text-lime-400">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
               {bi + 1}. {blockLabel(block.exercises.length)}
             </h3>
             <div className="flex gap-1 text-zinc-400">
@@ -163,7 +166,10 @@ export function WorkoutBuilder({
 
           <div className="flex flex-col gap-4">
             {block.exercises.map((e, ei) => (
-              <div key={e.key} className="flex flex-col gap-2 rounded-lg border border-zinc-800 p-3">
+              <div
+                key={e.key}
+                className="flex flex-col gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3"
+              >
                 <div className="flex items-center gap-2">
                   <input
                     className={field}
@@ -339,7 +345,7 @@ export function WorkoutBuilder({
 
       <button
         type="button"
-        className="rounded-xl border border-dashed border-zinc-700 py-3 text-zinc-400 hover:border-lime-400 hover:text-lime-400"
+        className="rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
         onClick={() => setBlocks((bs) => [...bs, { key: nextKey(), exercises: [emptyExercise()] }])}
       >
         + Add exercise block
@@ -347,12 +353,12 @@ export function WorkoutBuilder({
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-zinc-800 bg-zinc-950/95 p-4 backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 border-t border-zinc-800 bg-zinc-950/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
         <button
           type="button"
           disabled={pending}
           onClick={save}
-          className="mx-auto block w-full max-w-md rounded-xl bg-lime-400 py-3 font-semibold text-zinc-950 hover:bg-lime-300 disabled:opacity-50"
+          className="mx-auto block w-full max-w-md rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
         >
           {pending ? "Saving…" : workoutId ? "Save changes" : "Create workout"}
         </button>

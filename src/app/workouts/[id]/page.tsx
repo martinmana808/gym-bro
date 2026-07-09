@@ -15,32 +15,36 @@ export default async function WorkoutDetailPage({
 }) {
   const { id } = await params;
   const userId = await requireUserId();
-  const structure = await getWorkoutStructure(id, userId);
-  if (!structure) notFound();
-  const { workout, blocks } = structure;
-  const [history, unfinished] = await Promise.all([
+  const [structure, history, unfinished] = await Promise.all([
+    getWorkoutStructure(id, userId),
     getWorkoutHistory(id),
     getUnfinishedSession(id, userId),
   ]);
+  if (!structure) notFound();
+  const { workout, blocks } = structure;
   // Oldest → newest, like the week columns of the spreadsheet.
   const columns = [...history.sessions].reverse();
   const exercisesInOrder = blocks.flatMap((b) => b.exercises);
 
   return (
-    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 py-6">
+    <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-10 pt-6">
       <header className="flex items-center gap-3">
-        <Link href="/workouts" className="text-zinc-500 hover:text-zinc-300">
+        <Link
+          href="/workouts"
+          aria-label="Back to workouts"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+        >
           ←
         </Link>
-        <div className="flex-1">
-          <h1 className="text-2xl font-bold">{workout.name}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-2xl font-bold tracking-tight">{workout.name}</h1>
           <p className="text-sm text-zinc-400">
             Default rest: {formatSeconds(workout.defaultRestSeconds)}
           </p>
         </div>
         <Link
           href={`/workouts/${workout.id}/edit`}
-          className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:border-zinc-500"
+          className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-500"
         >
           Edit
         </Link>
@@ -49,25 +53,30 @@ export default async function WorkoutDetailPage({
       {unfinished ? (
         <Link
           href={`/sessions/${unfinished.id}`}
-          className="rounded-xl bg-amber-400 py-3 text-center font-semibold text-zinc-950 hover:bg-amber-300"
+          className="rounded-2xl bg-amber-400 py-3.5 text-center font-bold text-zinc-950 shadow-lg shadow-amber-400/15 transition hover:bg-amber-300 active:scale-[0.98]"
         >
           Resume session in progress
         </Link>
       ) : (
         <form action={startSession.bind(null, workout.id)}>
-          <button className="w-full rounded-xl bg-lime-400 py-3 font-semibold text-zinc-950 hover:bg-lime-300">
+          <button className="w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98]">
             Start workout
           </button>
         </form>
       )}
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">Plan</h2>
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">
+          Plan
+        </h2>
         <div className="flex flex-col gap-3">
-          {blocks.map((block, i) => (
-            <div key={block.id} className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
+          {blocks.map((block) => (
+            <div
+              key={block.id}
+              className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4"
+            >
               {block.exercises.length > 1 && (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-lime-400">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
                   {blockLabel(block.exercises.length)} — no rest in between
                 </p>
               )}
@@ -81,7 +90,6 @@ export default async function WorkoutDetailPage({
                   </span>
                 </div>
               ))}
-              {i < blocks.length - 1 && null}
             </div>
           ))}
           {blocks.length === 0 && (
@@ -91,7 +99,7 @@ export default async function WorkoutDetailPage({
       </section>
 
       <section>
-        <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-zinc-500">
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">
           History
         </h2>
         {columns.length === 0 ? (
@@ -100,15 +108,15 @@ export default async function WorkoutDetailPage({
             just like the spreadsheet.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-zinc-800">
+          <div className="overflow-x-auto rounded-2xl border border-zinc-800/80">
             <table className="w-full min-w-max text-sm">
               <thead>
                 <tr className="border-b border-zinc-800 bg-zinc-900/60 text-left text-zinc-400">
-                  <th className="px-3 py-2 font-medium">Exercise</th>
-                  <th className="px-3 py-2 font-medium">Target</th>
+                  <th className="px-3 py-2.5 font-medium">Exercise</th>
+                  <th className="px-3 py-2.5 font-medium">Target</th>
                   {columns.map((s) => (
-                    <th key={s.id} className="px-3 py-2 font-medium">
-                      <Link href={`/sessions/${s.id}`} className="hover:text-lime-400">
+                    <th key={s.id} className="px-3 py-2.5 font-medium">
+                      <Link href={`/sessions/${s.id}`} className="transition hover:text-lime-400">
                         {s.startedAt.toLocaleDateString(undefined, {
                           month: "short",
                           day: "numeric",
@@ -120,15 +128,18 @@ export default async function WorkoutDetailPage({
               </thead>
               <tbody>
                 {exercisesInOrder.map((e) => (
-                  <tr key={e.id} className="border-b border-zinc-800/60 last:border-0">
-                    <td className="px-3 py-2 font-medium">{e.name}</td>
-                    <td className="px-3 py-2 text-zinc-400">{formatTarget(e)}</td>
+                  <tr
+                    key={e.id}
+                    className="border-b border-zinc-800/60 last:border-0 even:bg-zinc-900/30"
+                  >
+                    <td className="px-3 py-2.5 font-medium">{e.name}</td>
+                    <td className="px-3 py-2.5 text-zinc-400">{formatTarget(e)}</td>
                     {columns.map((s) => {
                       const logs = (history.logsBySession[s.id] ?? []).filter(
                         (l) => l.exerciseId === e.id,
                       );
                       return (
-                        <td key={s.id} className="whitespace-nowrap px-3 py-2 tabular-nums">
+                        <td key={s.id} className="whitespace-nowrap px-3 py-2.5 tabular-nums">
                           {logs.length ? logs.map(formatLoggedSet).join(" · ") : "—"}
                         </td>
                       );
@@ -141,10 +152,10 @@ export default async function WorkoutDetailPage({
         )}
       </section>
 
-      <form action={deleteWorkout.bind(null, workout.id)} className="mt-auto pt-4">
+      <form action={deleteWorkout.bind(null, workout.id)} className="mt-auto pt-4 text-center">
         <ConfirmSubmit
           message={`Delete "${workout.name}" and all its history? This cannot be undone.`}
-          className="text-sm text-red-400/80 hover:text-red-400"
+          className="text-sm text-zinc-600 transition hover:text-red-400"
         >
           Delete workout
         </ConfirmSubmit>

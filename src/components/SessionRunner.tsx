@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { finishSession, logSet } from "@/app/actions";
+import { deleteSession, finishSession, logSet } from "@/app/actions";
 import {
   blockLabel,
   buildSteps,
@@ -23,12 +24,11 @@ export type LogEntry = {
 
 const logKey = (exerciseId: string, setNumber: number) => `${exerciseId}#${setNumber}`;
 
-const bigField =
-  "w-full rounded-xl border border-zinc-700 bg-zinc-900 px-4 py-3 text-center text-2xl " +
-  "font-semibold text-zinc-100 focus:border-lime-400 focus:outline-none";
+const isNextRedirect = (e: unknown) => !!e && typeof e === "object" && "digest" in e;
 
 export function SessionRunner({
   sessionId,
+  workoutId,
   workoutName,
   startedAtMs,
   defaultRestSeconds,
@@ -37,6 +37,7 @@ export function SessionRunner({
   previousLogs,
 }: {
   sessionId: string;
+  workoutId: string;
   workoutName: string;
   startedAtMs: number;
   defaultRestSeconds: number;
@@ -66,6 +67,7 @@ export function SessionRunner({
   const [resting, setResting] = useState<{ endsAt: number; total: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
+  const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const step = setSteps[setIndex];
@@ -142,30 +144,51 @@ export function SessionRunner({
     }
   };
 
+  const discard = async () => {
+    if (!confirm("Discard this session? Its logged sets will be deleted.")) return;
+    setDiscarding(true);
+    try {
+      await deleteSession(sessionId); // redirects back to the workout page
+    } catch (e) {
+      if (isNextRedirect(e)) return;
+      setError("Could not discard the session — try again.");
+      setDiscarding(false);
+    }
+  };
+
   const elapsed = formatClock((now - startedAtMs) / 1000);
   const loggedCount = logs.size;
+  const prev = step ? prevMap.get(logKey(step.exercise.id, step.setNumber)) : undefined;
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-8">
-      <header className="flex items-center justify-between py-4">
-        <div>
-          <h1 className="font-semibold">{workoutName}</h1>
+    <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
+      <header className="flex items-center gap-3 py-4">
+        <Link
+          href={`/workouts/${workoutId}`}
+          aria-label="Leave session — your progress is saved"
+          title="Leave session — your progress is saved"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+        >
+          ←
+        </Link>
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate font-semibold tracking-tight">{workoutName}</h1>
           <p className="text-sm text-zinc-400">
             <span className="tabular-nums">{elapsed}</span> · {loggedCount}/{setSteps.length} sets
           </p>
         </div>
         <button
           onClick={finish}
-          disabled={finishing}
-          className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-300 hover:border-lime-400 hover:text-lime-400 disabled:opacity-50"
+          disabled={finishing || discarding}
+          className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-lime-400 hover:text-lime-400 disabled:opacity-50"
         >
           {finishing ? "Finishing…" : "Finish"}
         </button>
       </header>
 
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/80">
         <div
-          className="h-full rounded-full bg-lime-400 transition-all"
+          className="h-full rounded-full bg-lime-400 transition-all duration-500"
           style={{ width: `${(loggedCount / Math.max(1, setSteps.length)) * 100}%` }}
         />
       </div>
@@ -180,75 +203,53 @@ export function SessionRunner({
         />
       ) : done ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
-          <p className="text-4xl">🏁</p>
-          <h2 className="text-2xl font-bold">All sets logged!</h2>
+          <p className="text-5xl">🏁</p>
+          <h2 className="text-3xl font-bold tracking-tight">All sets logged!</h2>
           <p className="text-zinc-400">
-            Hit <span className="text-lime-400">Finish</span> to stamp your workout time.
+            Hit <span className="font-medium text-lime-400">Finish</span> to stamp your workout
+            time.
           </p>
           <button
             onClick={finish}
-            disabled={finishing}
-            className="rounded-xl bg-lime-400 px-8 py-3 font-semibold text-zinc-950 hover:bg-lime-300 disabled:opacity-50"
+            disabled={finishing || discarding}
+            className="mt-2 rounded-2xl bg-lime-400 px-10 py-4 text-lg font-bold text-zinc-950 shadow-lg shadow-lime-400/20 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
           >
             {finishing ? "Finishing…" : "Finish workout"}
           </button>
         </div>
       ) : step ? (
         <div className="flex flex-1 flex-col gap-5 pt-6">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-wide text-lime-400">
+          <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+            <p className="text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
               {step.blockSize > 1
                 ? `${blockLabel(step.blockSize)} ${step.posInRound}/${step.blockSize} · round ${step.round}/${step.rounds}`
-                : `Set ${step.round}/${step.rounds}`}
+                : `Set ${step.round} of ${step.rounds}`}
             </p>
-            <h2 className="mt-1 text-3xl font-bold">{step.exercise.name}</h2>
-            <p className="mt-1 text-zinc-400">
-              Target: {formatTarget(step.exercise)}
-              {(() => {
-                const prev = prevMap.get(logKey(step.exercise.id, step.setNumber));
-                return prev ? ` · Last time: ${formatLoggedSet(prev)}` : "";
-              })()}
-            </p>
+            <h2 className="mt-2 text-3xl font-bold tracking-tight">{step.exercise.name}</h2>
+            <div className="mt-3 flex flex-wrap gap-2 text-sm">
+              <span className="rounded-full bg-zinc-800/80 px-3 py-1 text-zinc-300">
+                Target {formatTarget(step.exercise)}
+              </span>
+              {prev && (
+                <span className="rounded-full bg-zinc-800/80 px-3 py-1 tabular-nums text-zinc-400">
+                  Last time {formatLoggedSet(prev)}
+                </span>
+              )}
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-sm text-zinc-400">Weight (kg)</span>
-              <input
-                className={bigField}
-                type="number"
-                inputMode="decimal"
-                step="0.5"
-                min={0}
-                value={weight}
-                onChange={(e) => setWeight(e.target.value)}
-                placeholder="—"
-              />
-            </label>
+          <div className="flex flex-col gap-3">
+            <NumberField
+              label="Weight (kg)"
+              value={weight}
+              onChange={setWeight}
+              step={2.5}
+              decimal
+            />
             {step.exercise.measurement === "reps" ? (
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm text-zinc-400">Reps</span>
-                <input
-                  className={bigField}
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={reps}
-                  onChange={(e) => setReps(e.target.value)}
-                />
-              </label>
+              <NumberField label="Reps" value={reps} onChange={setReps} step={1} />
             ) : (
-              <label className="flex flex-col gap-1.5">
-                <span className="text-sm text-zinc-400">Seconds</span>
-                <input
-                  className={bigField}
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
-                  value={seconds}
-                  onChange={(e) => setSeconds(e.target.value)}
-                />
-              </label>
+              <NumberField label="Seconds" value={seconds} onChange={setSeconds} step={5} />
             )}
           </div>
 
@@ -256,8 +257,8 @@ export function SessionRunner({
 
           <button
             onClick={submitSet}
-            disabled={saving}
-            className="rounded-xl bg-lime-400 py-4 text-lg font-semibold text-zinc-950 hover:bg-lime-300 disabled:opacity-50"
+            disabled={saving || discarding}
+            className="rounded-2xl bg-lime-400 py-4 text-lg font-bold text-zinc-950 shadow-lg shadow-lime-400/20 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
           >
             {saving ? "Saving…" : "Log set"}
           </button>
@@ -266,22 +267,84 @@ export function SessionRunner({
             <button
               onClick={() => setSetIndex((i) => Math.max(0, i - 1))}
               disabled={setIndex === 0}
-              className="hover:text-zinc-300 disabled:opacity-30"
+              className="rounded-lg px-2 py-1 transition hover:text-zinc-300 disabled:opacity-30"
             >
               ← Previous set
             </button>
             <button
               onClick={() => setSetIndex((i) => Math.min(setSteps.length - 1, i + 1))}
               disabled={setIndex >= setSteps.length - 1}
-              className="hover:text-zinc-300 disabled:opacity-30"
+              className="rounded-lg px-2 py-1 transition hover:text-zinc-300 disabled:opacity-30"
             >
               Skip set →
             </button>
           </div>
+
+          <button
+            onClick={discard}
+            disabled={discarding || finishing}
+            className="mx-auto mt-auto pt-4 text-xs text-zinc-600 transition hover:text-red-400 disabled:opacity-50"
+          >
+            {discarding ? "Discarding…" : "Discard session"}
+          </button>
         </div>
       ) : (
         <p className="pt-10 text-center text-zinc-400">This workout has no exercises yet.</p>
       )}
+    </div>
+  );
+}
+
+function NumberField({
+  label,
+  value,
+  onChange,
+  step,
+  decimal,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  step: number;
+  decimal?: boolean;
+}) {
+  const bump = (dir: 1 | -1) => {
+    const next = Math.max(0, (Number(value) || 0) + dir * step);
+    onChange(`${Math.round(next * 100) / 100}`);
+  };
+  return (
+    <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
+      <p className="pt-3 text-center text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
+        {label}
+      </p>
+      <div className="flex items-stretch">
+        <button
+          type="button"
+          aria-label={`Decrease ${label}`}
+          onClick={() => bump(-1)}
+          className="w-16 text-2xl font-medium text-zinc-500 transition hover:text-zinc-200 active:bg-zinc-800"
+        >
+          −
+        </button>
+        <input
+          className="w-full min-w-0 bg-transparent pb-3 pt-1 text-center text-4xl font-bold tabular-nums text-zinc-50 focus:outline-none"
+          type="number"
+          inputMode={decimal ? "decimal" : "numeric"}
+          step={decimal ? 0.5 : 1}
+          min={0}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="—"
+        />
+        <button
+          type="button"
+          aria-label={`Increase ${label}`}
+          onClick={() => bump(1)}
+          className="w-16 text-2xl font-medium text-zinc-500 transition hover:text-zinc-200 active:bg-zinc-800"
+        >
+          +
+        </button>
+      </div>
     </div>
   );
 }
@@ -302,32 +365,34 @@ function RestScreen({
   const pct = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
-      <p className="text-sm font-semibold uppercase tracking-wide text-sky-400">Rest</p>
+      <p className="text-xs font-semibold uppercase tracking-[0.25em] text-sky-400">Rest</p>
       <div
-        className="grid size-48 place-items-center rounded-full"
+        className="grid size-52 place-items-center rounded-full"
         style={{
           background: `conic-gradient(var(--color-sky-400) ${pct * 360}deg, var(--color-zinc-800) 0deg)`,
         }}
       >
-        <div className="grid size-40 place-items-center rounded-full bg-zinc-950">
-          <span className="text-5xl font-bold tabular-nums">{formatClock(remaining)}</span>
+        <div className="grid size-[11.5rem] place-items-center rounded-full bg-zinc-950">
+          <span className="text-6xl font-bold tabular-nums tracking-tight">
+            {formatClock(remaining)}
+          </span>
         </div>
       </div>
       {nextUp && (
         <p className="text-zinc-400">
-          Next up: <span className="text-zinc-100">{nextUp}</span>
+          Next up: <span className="font-medium text-zinc-100">{nextUp}</span>
         </p>
       )}
       <div className="flex gap-3">
         <button
           onClick={onExtend}
-          className="rounded-xl border border-zinc-700 px-6 py-3 font-semibold text-zinc-200 hover:border-sky-400"
+          className="rounded-2xl border border-zinc-700 px-7 py-3.5 font-semibold text-zinc-200 transition hover:border-sky-400 active:scale-[0.98]"
         >
           +30s
         </button>
         <button
           onClick={onSkip}
-          className="rounded-xl bg-sky-400 px-6 py-3 font-semibold text-zinc-950 hover:bg-sky-300"
+          className="rounded-2xl bg-sky-400 px-7 py-3.5 font-semibold text-zinc-950 shadow-lg shadow-sky-400/20 transition hover:bg-sky-300 active:scale-[0.98]"
         >
           Skip rest
         </button>

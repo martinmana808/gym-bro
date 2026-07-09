@@ -28,6 +28,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     return (
       <SessionRunner
         sessionId={session.id}
+        workoutId={structure.workout.id}
         workoutName={structure.workout.name}
         startedAtMs={session.startedAt.getTime()}
         defaultRestSeconds={structure.workout.defaultRestSeconds}
@@ -46,16 +47,17 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const exercisesInOrder = structure.blocks.flatMap((b) => b.exercises);
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 py-6">
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pb-10 pt-6">
       <header className="flex items-center gap-3">
         <Link
           href={`/workouts/${structure.workout.id}`}
-          className="text-zinc-500 hover:text-zinc-300"
+          aria-label="Back to workout"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
         >
           ←
         </Link>
-        <div>
-          <h1 className="text-2xl font-bold">{structure.workout.name}</h1>
+        <div className="min-w-0">
+          <h1 className="truncate text-2xl font-bold tracking-tight">{structure.workout.name}</h1>
           <p className="text-sm text-zinc-400">
             {session.startedAt.toLocaleDateString(undefined, {
               weekday: "short",
@@ -67,13 +69,19 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       </header>
 
       <div className="grid grid-cols-2 gap-3 text-center">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-          <p className="text-3xl font-bold tabular-nums">{formatClock(durationSeconds)}</p>
-          <p className="text-sm text-zinc-400">duration</p>
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+          <p className="text-3xl font-bold tabular-nums tracking-tight">
+            {formatClock(durationSeconds)}
+          </p>
+          <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
+            duration
+          </p>
         </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4">
-          <p className="text-3xl font-bold tabular-nums">{logs.length}</p>
-          <p className="text-sm text-zinc-400">sets logged</p>
+        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+          <p className="text-3xl font-bold tabular-nums tracking-tight">{logs.length}</p>
+          <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
+            sets logged
+          </p>
         </div>
       </div>
 
@@ -86,7 +94,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           return (
             <div
               key={e.id}
-              className="flex items-baseline justify-between gap-3 rounded-lg border border-zinc-800 px-3 py-2"
+              className="flex items-baseline justify-between gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-4 py-3"
             >
               <span className="font-medium">{e.name}</span>
               <span className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
@@ -98,10 +106,10 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         {logs.length === 0 && <p className="text-sm text-zinc-500">No sets were logged.</p>}
       </section>
 
-      <form action={deleteSession.bind(null, session.id)} className="mt-auto pt-4">
+      <form action={deleteSession.bind(null, session.id)} className="mt-auto pt-4 text-center">
         <ConfirmSubmit
           message="Delete this session and its logged sets?"
-          className="text-sm text-red-400/80 hover:text-red-400"
+          className="text-sm text-zinc-600 transition hover:text-red-400"
         >
           Delete session
         </ConfirmSubmit>
