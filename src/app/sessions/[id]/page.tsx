@@ -98,7 +98,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             >
               <span className="font-medium">{e.name}</span>
               <span className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
-                {mine.map(formatLoggedSet).join(" · ")}
+                {mine.map((l) => formatLoggedSet(l)).join(" · ")}
               </span>
             </div>
           );

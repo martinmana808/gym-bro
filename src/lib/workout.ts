@@ -12,6 +12,8 @@ export type RunnerExercise = {
   repsMax: number | null;
   timeSeconds: number | null;
   restOverrideSeconds: number | null;
+  note: string | null;
+  weightUnit: WeightUnit;
 };
 
 export type RunnerBlock = {
@@ -84,11 +86,51 @@ export type LoggedSet = {
   timeSeconds: number | null;
 };
 
-/** "60×12" | "12" | "45s" — one logged set. */
-export function formatLoggedSet(l: LoggedSet): string {
+/** "72" | "22.5" | "20br" — a bare weight value with the bricks suffix. */
+export function formatWeight(w: number, unit: WeightUnit): string {
+  return `${trimNumber(w)}${unit === "bricks" ? "br" : ""}`;
+}
+
+/** "72 kg" | "20 br" | "—" — a labelled current working weight. */
+export function formatCurrentWeight(w: number | null, unit: WeightUnit): string {
+  if (w == null) return "—";
+  return `${trimNumber(w)} ${unit === "bricks" ? "br" : "kg"}`;
+}
+
+/** "60×12" | "20br×8" | "12" | "45s" — one logged set. */
+export function formatLoggedSet(l: LoggedSet, unit: WeightUnit = "kg"): string {
   if (l.timeSeconds != null) return formatSeconds(l.timeSeconds);
-  if (l.weight != null) return `${trimNumber(l.weight)}×${l.reps ?? "?"}`;
+  if (l.weight != null) return `${formatWeight(l.weight, unit)}×${l.reps ?? "?"}`;
   return `${l.reps ?? "?"}`;
+}
+
+/**
+ * Dense sheet-style cell for one exercise in one session: reps joined by "·",
+ * with the weight in parens only when it differs from the previous set
+ * (or, for the first set, from the exercise's current working weight).
+ * "8·8·8·6" | "8·8 (70) 8·6" | "(68) 8·8" | "45s·40s" | "—"
+ */
+export function formatSessionCell(
+  logs: LoggedSet[],
+  unit: WeightUnit = "kg",
+  currentWeight: number | null = null,
+): string {
+  if (!logs.length) return "—";
+  const parts: string[] = [];
+  let prevWeight = currentWeight;
+  for (const l of [...logs].sort((a, b) => a.setNumber - b.setNumber)) {
+    if (l.weight != null && l.weight !== prevWeight) {
+      parts.push(`(${formatWeight(l.weight, unit)})`);
+      prevWeight = l.weight;
+    }
+    parts.push(l.timeSeconds != null ? formatSeconds(l.timeSeconds) : `${l.reps ?? "?"}`);
+  }
+  let out = parts[0];
+  for (let i = 1; i < parts.length; i++) {
+    const paren = parts[i].startsWith("(") || parts[i - 1].startsWith("(");
+    out += paren ? ` ${parts[i]}` : `·${parts[i]}`;
+  }
+  return out;
 }
 
 /** "45s" | "1m" | "1m30" */

@@ -140,7 +140,7 @@ export default async function WorkoutDetailPage({
                       );
                       return (
                         <td key={s.id} className="whitespace-nowrap px-3 py-2.5 tabular-nums">
-                          {logs.length ? logs.map(formatLoggedSet).join(" · ") : "—"}
+                          {logs.length ? logs.map((l) => formatLoggedSet(l)).join(" · ") : "—"}
                         </td>
                       );
                     })}

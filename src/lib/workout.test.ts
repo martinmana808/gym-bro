@@ -2,9 +2,13 @@ import { describe, expect, it } from "vitest";
 import {
   buildSteps,
   formatClock,
+  formatCurrentWeight,
   formatLoggedSet,
   formatSeconds,
+  formatSessionCell,
   formatTarget,
+  formatWeight,
+  type LoggedSet,
   type RunnerExercise,
 } from "./workout";
 
@@ -18,6 +22,8 @@ const ex = (over: Partial<RunnerExercise>): RunnerExercise => ({
   repsMax: null,
   timeSeconds: null,
   restOverrideSeconds: null,
+  note: null,
+  weightUnit: "kg",
   ...over,
 });
 
@@ -95,5 +101,69 @@ describe("formatting", () => {
     expect(formatSeconds(120)).toBe("2m");
     expect(formatClock(65)).toBe("1:05");
     expect(formatClock(3665)).toBe("1:01:05");
+  });
+});
+
+const set = (setNumber: number, weight: number | null, reps: number | null): LoggedSet => ({
+  setNumber,
+  weight,
+  reps,
+  timeSeconds: null,
+});
+
+describe("weight units", () => {
+  it("formats weights per unit", () => {
+    expect(formatWeight(72, "kg")).toBe("72");
+    expect(formatWeight(22.5, "kg")).toBe("22.5");
+    expect(formatWeight(20, "bricks")).toBe("20br");
+    expect(formatCurrentWeight(72, "kg")).toBe("72 kg");
+    expect(formatCurrentWeight(20, "bricks")).toBe("20 br");
+    expect(formatCurrentWeight(null, "kg")).toBe("—");
+  });
+
+  it("formats logged sets per unit", () => {
+    expect(formatLoggedSet(set(1, 72, 8), "kg")).toBe("72×8");
+    expect(formatLoggedSet(set(1, 20, 8), "bricks")).toBe("20br×8");
+  });
+});
+
+describe("formatSessionCell", () => {
+  it("shows reps only when weight matches the current weight", () => {
+    expect(
+      formatSessionCell([set(1, 68, 8), set(2, 68, 8), set(3, 68, 8), set(4, 68, 6)], "kg", 68),
+    ).toBe("8·8·8·6");
+  });
+
+  it("shows weight in parens when it changes mid-session", () => {
+    expect(
+      formatSessionCell([set(1, 68, 8), set(2, 68, 8), set(3, 70, 8), set(4, 70, 6)], "kg", 68),
+    ).toBe("8·8 (70) 8·6");
+  });
+
+  it("flags the first set when it differs from the current weight", () => {
+    expect(formatSessionCell([set(1, 68, 8), set(2, 68, 8)], "kg", 72)).toBe("(68) 8·8");
+  });
+
+  it("never shows parens for weightless sets", () => {
+    expect(formatSessionCell([set(1, null, 12), set(2, null, 13)], "kg", null)).toBe("12·13");
+  });
+
+  it("formats bricks and time-based sets", () => {
+    expect(formatSessionCell([set(1, 20, 8), set(2, 20, 8)], "bricks", 18)).toBe("(20br) 8·8");
+    expect(
+      formatSessionCell(
+        [
+          { setNumber: 1, weight: null, reps: null, timeSeconds: 45 },
+          { setNumber: 2, weight: null, reps: null, timeSeconds: 40 },
+        ],
+        "kg",
+        null,
+      ),
+    ).toBe("45s·40s");
+  });
+
+  it("sorts by set number and handles empty input", () => {
+    expect(formatSessionCell([set(2, 68, 6), set(1, 68, 8)], "kg", 68)).toBe("8·6");
+    expect(formatSessionCell([], "kg", null)).toBe("—");
   });
 });
