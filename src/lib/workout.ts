@@ -86,6 +86,15 @@ export type LoggedSet = {
   timeSeconds: number | null;
 };
 
+/** One logged set addressed to its exercise — the runner/grid data shape. */
+export type SetEntry = {
+  exerciseId: string;
+  setNumber: number;
+  weight: number | null;
+  reps: number | null;
+  timeSeconds: number | null;
+};
+
 /** "72" | "22.5" | "20br" — a bare weight value with the bricks suffix. */
 export function formatWeight(w: number, unit: WeightUnit): string {
   return `${trimNumber(w)}${unit === "bricks" ? "br" : ""}`;

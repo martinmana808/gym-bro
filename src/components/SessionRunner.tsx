@@ -11,16 +11,13 @@ import {
   formatLoggedSet,
   formatTarget,
   type RunnerBlock,
+  type SetEntry,
   type SetStep,
 } from "@/lib/workout";
+import { NumberField } from "@/components/NumberField";
+import { SetGrid } from "@/components/SetGrid";
 
-export type LogEntry = {
-  exerciseId: string;
-  setNumber: number;
-  weight: number | null;
-  reps: number | null;
-  timeSeconds: number | null;
-};
+export type LogEntry = SetEntry;
 
 const logKey = (exerciseId: string, setNumber: number) => `${exerciseId}#${setNumber}`;
 
@@ -74,6 +71,7 @@ export function SessionRunner({
   const [finishing, setFinishing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showGrid, setShowGrid] = useState(false);
 
   const step = setSteps[setIndex];
 
@@ -182,6 +180,13 @@ export function SessionRunner({
             <span className="tabular-nums">{elapsed}</span> · {loggedCount}/{setSteps.length} sets
           </p>
         </div>
+        <button
+          onClick={() => setShowGrid(true)}
+          aria-label="Show all sets"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+        >
+          ▦
+        </button>
         <button
           onClick={finish}
           disabled={finishing || discarding}
@@ -320,60 +325,38 @@ export function SessionRunner({
       ) : (
         <p className="pt-10 text-center text-zinc-400">This workout has no exercises yet.</p>
       )}
-    </div>
-  );
-}
 
-function NumberField({
-  label,
-  value,
-  onChange,
-  step,
-  decimal,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  step: number;
-  decimal?: boolean;
-}) {
-  const bump = (dir: 1 | -1) => {
-    const next = Math.max(0, (Number(value) || 0) + dir * step);
-    onChange(`${Math.round(next * 100) / 100}`);
-  };
-  return (
-    <div className="overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/80">
-      <p className="pt-3 text-center text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
-        {label}
-      </p>
-      <div className="flex items-stretch">
-        <button
-          type="button"
-          aria-label={`Decrease ${label}`}
-          onClick={() => bump(-1)}
-          className="w-16 text-2xl font-medium text-zinc-500 transition hover:text-zinc-200 active:bg-zinc-800"
-        >
-          −
-        </button>
-        <input
-          className="w-full min-w-0 bg-transparent pb-3 pt-1 text-center text-4xl font-bold tabular-nums text-zinc-50 focus:outline-none"
-          type="number"
-          inputMode={decimal ? "decimal" : "numeric"}
-          step={decimal ? 0.5 : 1}
-          min={0}
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          placeholder="—"
-        />
-        <button
-          type="button"
-          aria-label={`Increase ${label}`}
-          onClick={() => bump(1)}
-          className="w-16 text-2xl font-medium text-zinc-500 transition hover:text-zinc-200 active:bg-zinc-800"
-        >
-          +
-        </button>
-      </div>
+      {showGrid && (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/95 backdrop-blur">
+          <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
+            <header className="flex items-center justify-between">
+              <h2 className="font-semibold tracking-tight">All sets</h2>
+              <button
+                onClick={() => setShowGrid(false)}
+                aria-label="Close"
+                className="grid size-10 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-zinc-400 transition hover:text-zinc-100"
+              >
+                ✕
+              </button>
+            </header>
+            <SetGrid
+              blocks={blocks}
+              entries={[...logs.values()]}
+              activeKey={stepKey}
+              onCellTap={(exerciseId, setNumber) => {
+                const i = setSteps.findIndex(
+                  (s) => s.exercise.id === exerciseId && s.setNumber === setNumber,
+                );
+                if (i !== -1) {
+                  setSetIndex(i);
+                  setResting(null);
+                }
+                setShowGrid(false);
+              }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
