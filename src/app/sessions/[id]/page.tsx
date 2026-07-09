@@ -5,7 +5,8 @@ import { getSessionData } from "@/db/queries";
 import { deleteSession } from "@/app/actions";
 import { SessionRunner, type LogEntry } from "@/components/SessionRunner";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
-import { formatClock, formatLoggedSet } from "@/lib/workout";
+import { FinishedSets } from "@/components/FinishedSets";
+import { formatClock } from "@/lib/workout";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,6 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
 
   // Finished: summary view.
   const durationSeconds = (session.finishedAt.getTime() - session.startedAt.getTime()) / 1000;
-  const exercisesInOrder = structure.blocks.flatMap((b) => b.exercises);
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pb-10 pt-6">
@@ -86,30 +86,12 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         </div>
       </div>
 
-      <section className="flex flex-col gap-2">
-        {exercisesInOrder.map((e) => {
-          const mine = logs
-            .filter((l) => l.exerciseId === e.id)
-            .sort((a, b) => a.setNumber - b.setNumber);
-          if (!mine.length) return null;
-          const note = notes.find((n) => n.exerciseId === e.id)?.note;
-          return (
-            <div
-              key={e.id}
-              className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-4 py-3"
-            >
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="font-medium">{e.name}</span>
-                <span className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
-                  {mine.map((l) => formatLoggedSet(l, e.weightUnit)).join(" · ")}
-                </span>
-              </div>
-              {note && <p className="mt-1 text-sm text-zinc-500">{note}</p>}
-            </div>
-          );
-        })}
-        {logs.length === 0 && <p className="text-sm text-zinc-500">No sets were logged.</p>}
-      </section>
+      <FinishedSets
+        sessionId={session.id}
+        blocks={structure.blocks.map((b) => ({ id: b.id, exercises: b.exercises }))}
+        initialEntries={logs.map(toEntry)}
+        notes={notes.map((n) => ({ exerciseId: n.exerciseId, note: n.note }))}
+      />
 
       <form action={deleteSession.bind(null, session.id)} className="mt-auto pt-4 text-center">
         <ConfirmSubmit
