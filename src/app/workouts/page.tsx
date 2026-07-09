@@ -83,6 +83,12 @@ export default async function WorkoutsPage() {
       >
         + New workout
       </Link>
+
+      <div className="flex justify-center gap-5 text-sm text-zinc-600">
+        <Link href="/import" className="transition hover:text-zinc-300">
+          Import spreadsheet
+        </Link>
+      </div>
     </main>
   );
 }
