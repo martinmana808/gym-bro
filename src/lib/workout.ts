@@ -1,5 +1,7 @@
 // Pure domain logic shared by the session runner and the history views.
 
+export type WeightUnit = "kg" | "bricks";
+
 export type RunnerExercise = {
   id: string;
   name: string;

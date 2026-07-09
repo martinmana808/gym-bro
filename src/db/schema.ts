@@ -7,6 +7,7 @@ import {
   uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
+import type { WeightUnit } from "@/lib/workout";
 
 export const users = pgTable("users", {
   id: uuid("id").primaryKey().defaultRandom(),
@@ -53,6 +54,8 @@ export const exercises = pgTable("exercises", {
   repsMax: integer("reps_max"),
   timeSeconds: integer("time_seconds"),
   restOverrideSeconds: integer("rest_override_seconds"),
+  note: text("note"),
+  weightUnit: text("weight_unit").$type<WeightUnit>().notNull().default("kg"),
 });
 
 export const sessions = pgTable("sessions", {
@@ -87,8 +90,25 @@ export const setLogs = pgTable(
   (t) => [uniqueIndex("set_logs_unique_set").on(t.sessionId, t.exerciseId, t.setNumber)],
 );
 
+// One optional free-text note per exercise per session ("felt weak", "machine taken").
+export const sessionNotes = pgTable(
+  "session_notes",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    sessionId: uuid("session_id")
+      .notNull()
+      .references(() => sessions.id, { onDelete: "cascade" }),
+    exerciseId: uuid("exercise_id")
+      .notNull()
+      .references(() => exercises.id, { onDelete: "cascade" }),
+    note: text("note").notNull(),
+  },
+  (t) => [uniqueIndex("session_notes_unique").on(t.sessionId, t.exerciseId)],
+);
+
 export type Workout = typeof workouts.$inferSelect;
 export type Block = typeof blocks.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type SetLog = typeof setLogs.$inferSelect;
+export type SessionNote = typeof sessionNotes.$inferSelect;
