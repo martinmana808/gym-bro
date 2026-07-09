@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteSession, finishSession, logSet, saveSessionNote } from "@/app/actions";
@@ -16,6 +16,8 @@ import {
 } from "@/lib/workout";
 import { NumberField } from "@/components/NumberField";
 import { SetGrid } from "@/components/SetGrid";
+import { useWakeLock } from "@/lib/useWakeLock";
+import { primeAudio, restAlert } from "@/lib/restAlert";
 
 export type LogEntry = SetEntry;
 
@@ -45,6 +47,7 @@ export function SessionRunner({
   initialNotes: { exerciseId: string; note: string }[];
 }) {
   const router = useRouter();
+  useWakeLock(true);
   const steps = useMemo(() => buildSteps(blocks, defaultRestSeconds), [blocks, defaultRestSeconds]);
   const setSteps = useMemo(() => steps.filter((s): s is SetStep => s.kind === "set"), [steps]);
 
@@ -104,7 +107,20 @@ export function SessionRunner({
   const isResting = resting !== null && restRemaining > 0;
   const done = logs.size >= setSteps.length && !isResting;
 
+  // Fire the alert exactly once when the countdown crosses zero.
+  const restAlertedFor = useRef<typeof resting>(null);
+  useEffect(() => {
+    if (resting && restRemaining <= 0 && restAlertedFor.current !== resting) {
+      restAlertedFor.current = resting;
+      restAlert();
+      // Deferred so setState doesn't run synchronously inside the effect body.
+      const id = setTimeout(() => setResting(null), 0);
+      return () => clearTimeout(id);
+    }
+  }, [resting, restRemaining]);
+
   const submitSet = async () => {
+    primeAudio();
     if (!step) return;
     const isTime = step.exercise.measurement === "time";
     const entry: LogEntry = {
