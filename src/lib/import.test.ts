@@ -99,3 +99,22 @@ describe("parseRepList", () => {
     );
   });
 });
+
+describe("parser robustness", () => {
+  it("rejects an over-long digit run without hanging or crashing", () => {
+    const c = parseSessionCell("1".repeat(40), 4, null);
+    expect(c.error).toBeTruthy();
+    expect(c.sets).toEqual([]);
+  });
+
+  it("rejects impossible calendar dates", () => {
+    const { days } = parseSpreadsheet("Day 1\tSets\tWeight\t31.02\nBench\t2\t60\t88", new Date(2026, 6, 9));
+    expect(days[0].dates).toEqual([]);
+  });
+
+  it("still parses a valid date next to the header", () => {
+    const { days } = parseSpreadsheet("Day 1\tSets\tWeight\t25.05\nBench\t2\t60\t88", new Date(2026, 6, 9));
+    expect(days[0].dates).toHaveLength(1);
+    expect(days[0].dates[0].getMonth()).toBe(4); // May
+  });
+});

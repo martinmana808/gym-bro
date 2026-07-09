@@ -134,6 +134,22 @@ export function parseSessionCell(
   const note = noteParts.join("; ") || null;
   if (!runs.length) return { raw, sets: [], note, ambiguous: false, error: "no reps found" };
 
+  // Cheap bound BEFORE combinatorial enumeration: any valid segmentation of the
+  // digit runs into exactly `sets` values of 1-2 digits each requires the total
+  // digit count D to satisfy sets <= D <= 2*sets. This keeps the enumeration
+  // below provably bounded (D <= 2*sets <= 40 since sets <= 20) and prevents an
+  // OOM crash on long contiguous digit runs from pasted-corruption input.
+  const totalDigits = runs.reduce((sum, r) => sum + r.text.length, 0);
+  if (totalDigits < sets || totalDigits > 2 * sets) {
+    return {
+      raw,
+      sets: [],
+      note,
+      ambiguous: false,
+      error: `cannot split ${totalDigits} digits into ${sets} sets`,
+    };
+  }
+
   // Every way to read the digit runs as exactly `sets` rep values (1–2 digits each).
   let combos: { reps: number[]; weights: (number | null)[] }[] = [{ reps: [], weights: [] }];
   for (const run of runs) {
@@ -220,6 +236,7 @@ function parseDate(cell: string, today: Date): Date | null {
   const month = parseInt(m[2], 10);
   if (dayNum < 1 || dayNum > 31 || month < 1 || month > 12) return null;
   const date = new Date(today.getFullYear(), month - 1, dayNum, 12);
+  if (date.getMonth() !== month - 1 || date.getDate() !== dayNum) return null;
   if (date.getTime() > today.getTime()) date.setFullYear(date.getFullYear() - 1);
   return date;
 }
