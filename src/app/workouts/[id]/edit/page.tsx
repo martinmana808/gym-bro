@@ -46,6 +46,7 @@ export default async function EditWorkoutPage({
               repsMax: e.repsMax,
               timeSeconds: e.timeSeconds,
               restOverrideSeconds: e.restOverrideSeconds,
+              note: e.note,
             })),
           })),
         }}

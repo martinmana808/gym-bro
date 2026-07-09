@@ -26,6 +26,7 @@ const emptyExercise = (): ExerciseDraft => ({
   repsMax: 15,
   timeSeconds: 30,
   restOverrideSeconds: null,
+  note: null,
 });
 
 const field =
@@ -76,6 +77,7 @@ export function WorkoutBuilder({
           repsMax: e.repsMax,
           timeSeconds: e.timeSeconds,
           restOverrideSeconds: e.restOverrideSeconds,
+          note: e.note,
         })),
       })),
     };
@@ -194,6 +196,15 @@ export function WorkoutBuilder({
                     </IconButton>
                   )}
                 </div>
+
+                <input
+                  className={field}
+                  value={e.note ?? ""}
+                  onChange={(ev) =>
+                    patchExercise(bi, ei, { note: ev.target.value || null })
+                  }
+                  placeholder="Note (e.g. + barbell, use the cable pulley)"
+                />
 
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1">

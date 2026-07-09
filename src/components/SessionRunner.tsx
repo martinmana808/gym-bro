@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteSession, finishSession, logSet } from "@/app/actions";
+import { deleteSession, finishSession, logSet, saveSessionNote } from "@/app/actions";
 import {
   blockLabel,
   buildSteps,
@@ -35,6 +35,7 @@ export function SessionRunner({
   blocks,
   initialLogs,
   previousLogs,
+  initialNotes,
 }: {
   sessionId: string;
   workoutId: string;
@@ -44,6 +45,7 @@ export function SessionRunner({
   blocks: RunnerBlock[];
   initialLogs: LogEntry[];
   previousLogs: LogEntry[];
+  initialNotes: { exerciseId: string; note: string }[];
 }) {
   const router = useRouter();
   const steps = useMemo(() => buildSteps(blocks, defaultRestSeconds), [blocks, defaultRestSeconds]);
@@ -51,6 +53,9 @@ export function SessionRunner({
 
   const [logs, setLogs] = useState<Map<string, LogEntry>>(
     () => new Map(initialLogs.map((l) => [logKey(l.exerciseId, l.setNumber), l])),
+  );
+  const [notes, setNotes] = useState<Map<string, string>>(
+    () => new Map(initialNotes.map((n) => [n.exerciseId, n.note])),
   );
   const prevMap = useMemo(
     () => new Map(previousLogs.map((l) => [logKey(l.exerciseId, l.setNumber), l])),
@@ -226,6 +231,9 @@ export function SessionRunner({
                 : `Set ${step.round} of ${step.rounds}`}
             </p>
             <h2 className="mt-2 text-3xl font-bold tracking-tight">{step.exercise.name}</h2>
+            {step.exercise.note && (
+              <p className="mt-1 text-sm text-zinc-500">{step.exercise.note}</p>
+            )}
             <div className="mt-3 flex flex-wrap gap-2 text-sm">
               <span className="rounded-full bg-zinc-800/80 px-3 py-1 text-zinc-300">
                 Target {formatTarget(step.exercise)}
@@ -236,6 +244,22 @@ export function SessionRunner({
                 </span>
               )}
             </div>
+            <TodayNote
+              key={step.exercise.id}
+              initial={notes.get(step.exercise.id) ?? ""}
+              onSave={async (value) => {
+                setNotes((m) => new Map(m).set(step.exercise.id, value));
+                try {
+                  await saveSessionNote({
+                    sessionId,
+                    exerciseId: step.exercise.id,
+                    note: value,
+                  });
+                } catch {
+                  setError("Could not save the note — try again.");
+                }
+              }}
+            />
           </div>
 
           <div className="flex flex-col gap-3">
@@ -346,6 +370,37 @@ function NumberField({
         </button>
       </div>
     </div>
+  );
+}
+
+function TodayNote({
+  initial,
+  onSave,
+}: {
+  initial: string;
+  onSave: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(initial !== "");
+  const [value, setValue] = useState(initial);
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mt-3 text-left text-sm text-zinc-500 transition hover:text-zinc-300"
+      >
+        + Add note for today
+      </button>
+    );
+  }
+  return (
+    <input
+      className="mt-3 w-full rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-2 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-lime-400 focus:outline-none"
+      value={value}
+      placeholder="Note for today (e.g. felt weak, machine taken)"
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={() => onSave(value)}
+    />
   );
 }
 

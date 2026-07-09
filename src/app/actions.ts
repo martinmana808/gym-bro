@@ -17,6 +17,7 @@ export type ExerciseInput = {
   repsMax: number | null;
   timeSeconds: number | null;
   restOverrideSeconds: number | null;
+  note: string | null;
 };
 
 export type BlockInput = { id?: string; exercises: ExerciseInput[] };
@@ -56,6 +57,7 @@ function sanitizeWorkout(input: WorkoutInput): WorkoutInput {
             e.restOverrideSeconds == null || `${e.restOverrideSeconds}` === ""
               ? null
               : int(e.restOverrideSeconds, 0, 3600, 0),
+          note: e.note?.trim() ? e.note.trim().slice(0, 500) : null,
         })),
     }))
     .filter((b) => b.exercises.length > 0);
@@ -98,6 +100,7 @@ async function insertBlocks(workoutId: string, blocks: BlockInput[], startPos = 
         repsMax: e.repsMax,
         timeSeconds: e.timeSeconds,
         restOverrideSeconds: e.restOverrideSeconds,
+        note: e.note,
       })),
     );
   }
@@ -178,6 +181,7 @@ export async function updateWorkout(workoutId: string, input: WorkoutInput) {
         repsMax: e.repsMax,
         timeSeconds: e.timeSeconds,
         restOverrideSeconds: e.restOverrideSeconds,
+        note: e.note,
       };
       if (e.id && keptExerciseIds.has(e.id)) {
         await db.update(schema.exercises).set(values).where(eq(schema.exercises.id, e.id));
@@ -248,6 +252,35 @@ export async function logSet(input: LogSetInput) {
     .onConflictDoUpdate({
       target: [schema.setLogs.sessionId, schema.setLogs.exerciseId, schema.setLogs.setNumber],
       set: { weight: values.weight, reps: values.reps, timeSeconds: values.timeSeconds },
+    });
+}
+
+export async function saveSessionNote(input: {
+  sessionId: string;
+  exerciseId: string;
+  note: string;
+}) {
+  const userId = await requireUserId();
+  const session = await ownedSession(input.sessionId, userId);
+  const db = await getDb();
+  const note = input.note.trim().slice(0, 500);
+  if (!note) {
+    await db
+      .delete(schema.sessionNotes)
+      .where(
+        and(
+          eq(schema.sessionNotes.sessionId, session.id),
+          eq(schema.sessionNotes.exerciseId, input.exerciseId),
+        ),
+      );
+    return;
+  }
+  await db
+    .insert(schema.sessionNotes)
+    .values({ sessionId: session.id, exerciseId: input.exerciseId, note })
+    .onConflictDoUpdate({
+      target: [schema.sessionNotes.sessionId, schema.sessionNotes.exerciseId],
+      set: { note },
     });
 }
 

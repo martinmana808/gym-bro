@@ -1,6 +1,6 @@
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import type { Block, Exercise, Session, SetLog, Workout } from "@/db/schema";
+import type { Block, Exercise, Session, SessionNote, SetLog, Workout } from "@/db/schema";
 
 export type WorkoutStructure = {
   workout: Workout;
@@ -76,6 +76,7 @@ export async function listWorkouts(userId: string): Promise<WorkoutListItem[]> {
 export type WorkoutHistory = {
   sessions: Session[]; // most recent first, finished only
   logsBySession: Record<string, SetLog[]>;
+  notesBySession: Record<string, SessionNote[]>;
 };
 
 export async function getWorkoutHistory(
@@ -96,7 +97,14 @@ export async function getWorkoutHistory(
     : [];
   const logsBySession: Record<string, SetLog[]> = {};
   for (const s of finished) logsBySession[s.id] = logs.filter((l) => l.sessionId === s.id);
-  return { sessions: finished, logsBySession };
+  const notes = finished.length
+    ? await db.query.sessionNotes.findMany({
+        where: inArray(schema.sessionNotes.sessionId, finished.map((s) => s.id)),
+      })
+    : [];
+  const notesBySession: Record<string, SessionNote[]> = {};
+  for (const s of finished) notesBySession[s.id] = notes.filter((n) => n.sessionId === s.id);
+  return { sessions: finished, logsBySession, notesBySession };
 }
 
 export async function getUnfinishedSession(workoutId: string, userId: string) {
@@ -116,6 +124,7 @@ export type SessionData = {
   structure: WorkoutStructure;
   logs: SetLog[]; // this session
   previousLogs: SetLog[]; // most recent finished session before this one
+  notes: SessionNote[];
 };
 
 export async function getSessionData(
@@ -140,5 +149,8 @@ export async function getSessionData(
   const previousLogs = prev
     ? await db.query.setLogs.findMany({ where: eq(schema.setLogs.sessionId, prev.id) })
     : [];
-  return { session, structure, logs, previousLogs };
+  const notes = await db.query.sessionNotes.findMany({
+    where: eq(schema.sessionNotes.sessionId, sessionId),
+  });
+  return { session, structure, logs, previousLogs, notes };
 }

@@ -14,7 +14,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const userId = await requireUserId();
   const data = await getSessionData(id, userId);
   if (!data) notFound();
-  const { session, structure, logs, previousLogs } = data;
+  const { session, structure, logs, previousLogs, notes } = data;
 
   const toEntry = (l: (typeof logs)[number]): LogEntry => ({
     exerciseId: l.exerciseId,
@@ -38,6 +38,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         }))}
         initialLogs={logs.map(toEntry)}
         previousLogs={previousLogs.map(toEntry)}
+        initialNotes={notes.map((n) => ({ exerciseId: n.exerciseId, note: n.note }))}
       />
     );
   }
@@ -91,15 +92,19 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             .filter((l) => l.exerciseId === e.id)
             .sort((a, b) => a.setNumber - b.setNumber);
           if (!mine.length) return null;
+          const note = notes.find((n) => n.exerciseId === e.id)?.note;
           return (
             <div
               key={e.id}
-              className="flex items-baseline justify-between gap-3 rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-4 py-3"
+              className="rounded-xl border border-zinc-800/80 bg-zinc-900/40 px-4 py-3"
             >
-              <span className="font-medium">{e.name}</span>
-              <span className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
-                {mine.map((l) => formatLoggedSet(l)).join(" · ")}
-              </span>
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="font-medium">{e.name}</span>
+                <span className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
+                  {mine.map((l) => formatLoggedSet(l, e.weightUnit)).join(" · ")}
+                </span>
+              </div>
+              {note && <p className="mt-1 text-sm text-zinc-500">{note}</p>}
             </div>
           );
         })}
