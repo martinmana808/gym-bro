@@ -1,0 +1,253 @@
+// Parser for the user's workout spreadsheet (pasted TSV or uploaded CSV).
+// Pure functions — no I/O — so every rule is unit-testable.
+
+import type { RepScheme } from "@/db/schema";
+import type { WeightUnit } from "@/lib/workout";
+
+export type ImportedSet = { setNumber: number; weight: number | null; reps: number | null };
+export type ImportedCell = {
+  raw: string;
+  sets: ImportedSet[];
+  note: string | null;
+  ambiguous: boolean;
+  error: string | null;
+};
+export type ImportedExercise = {
+  name: string;
+  sets: number;
+  weight: number | null;
+  weightUnit: WeightUnit;
+  repScheme: RepScheme;
+  repsMin: number | null;
+  note: string | null;
+  blockStart: boolean;
+  cells: (ImportedCell | null)[];
+};
+export type ImportedDay = { name: string; dates: Date[]; exercises: ImportedExercise[] };
+export type ParseResult = { days: ImportedDay[]; warnings: string[] };
+
+export function parseSpreadsheet(text: string, today: Date = new Date()): ParseResult {
+  const rows = splitRows(text);
+  const days: ImportedDay[] = [];
+  const warnings: string[] = [];
+  let day: ImportedDay | null = null;
+  let setsCol = -1;
+  let prev: ImportedExercise | null = null;
+
+  for (const [rowIndex, row] of rows.entries()) {
+    const si = row.findIndex((c) => /^sets$/i.test(c.trim()));
+    if (si > 0) {
+      // Header row starts a new day: "Day 1 | Sets | Weight | 25.05 | ..."
+      const dates = row
+        .slice(si + 2)
+        .map((c) => parseDate(c, today))
+        .filter((d): d is Date => d !== null);
+      day = { name: row[0].trim() || `Day ${days.length + 1}`, dates, exercises: [] };
+      days.push(day);
+      setsCol = si;
+      prev = null;
+      continue;
+    }
+    if (!day) continue;
+    const name = (row[0] ?? "").trim();
+    if (!name) {
+      prev = null; // blank separator row ends any block
+      continue;
+    }
+    const setsCell = (row[setsCol] ?? "").trim();
+    const blockStart = setsCell !== "";
+    const sets = blockStart ? parseInt(setsCell, 10) : (prev?.sets ?? 0);
+    if (!sets || Number.isNaN(sets)) {
+      warnings.push(`Row ${rowIndex + 1}: "${name}" has no set count — skipped`);
+      continue;
+    }
+    const w = parseWeightCell(row[setsCol + 1] ?? "");
+    const exercise: ImportedExercise = {
+      name,
+      sets,
+      weight: w.weight,
+      weightUnit: w.weightUnit,
+      repScheme: w.repScheme,
+      repsMin: w.repsMin,
+      note: w.note,
+      blockStart: blockStart || !prev,
+      cells: day.dates.map((_, i) => {
+        const raw = row[setsCol + 2 + i] ?? "";
+        return raw.trim() ? parseSessionCell(raw, sets, w.weight) : null;
+      }),
+    };
+    day.exercises.push(exercise);
+    prev = exercise;
+  }
+  if (!days.length) warnings.push("No day header found (need a row with a 'Sets' column).");
+  return { days, warnings };
+}
+
+/** "72" | "36.25(.pulley)" | "25 FAIL" | "12 reps min" | "Bodyweight" | "90 (+ barbell)" */
+export function parseWeightCell(raw: string): {
+  weight: number | null;
+  weightUnit: WeightUnit;
+  repScheme: RepScheme;
+  repsMin: number | null;
+  note: string | null;
+} {
+  const cleaned = raw.trim();
+  const weightUnit: WeightUnit = /plate|pulley|brick/i.test(cleaned) ? "bricks" : "kg";
+  const repScheme: RepScheme = /fail/i.test(cleaned) ? "failure" : "fixed";
+  const repsMinMatch = cleaned.match(/(\d+)\s*reps?\s*min/i);
+  if (repsMinMatch) {
+    return { weight: null, weightUnit, repScheme, repsMin: parseInt(repsMinMatch[1], 10), note: null };
+  }
+  const numMatch = cleaned.match(/\d+(?:[.,]\d+)?/);
+  const weight = numMatch ? parseFloat(numMatch[0].replace(",", ".")) : null;
+  let note = cleaned;
+  if (numMatch) note = note.replace(numMatch[0], "");
+  note = note.replace(/fail/i, "").replace(/[()]/g, "").trim();
+  return { weight, weightUnit, repScheme, repsMin: null, note: note || null };
+}
+
+/**
+ * One session cell: digit runs are rep sequences segmented to `sets` values;
+ * "(68)" switches the working weight; paren text becomes a note.
+ */
+export function parseSessionCell(
+  raw: string,
+  sets: number,
+  baseWeight: number | null,
+): ImportedCell {
+  const trimmed = raw.trim();
+  if (!trimmed) return { raw, sets: [], note: null, ambiguous: false, error: null };
+
+  const noteParts: string[] = [];
+  const runs: { text: string; weight: number | null }[] = [];
+  let weight = baseWeight;
+  for (const ev of tokenizeCell(trimmed)) {
+    if (ev.kind === "digits") {
+      runs.push({ text: ev.text, weight });
+      continue;
+    }
+    const num = ev.content.match(/\d+(?:[.,]\d+)?/);
+    if (num) weight = parseFloat(num[0].replace(",", "."));
+    const text = ev.content.replace(num?.[0] ?? "", "").replace(/^[.\s]+|[.\s]+$/g, "");
+    if (text) noteParts.push(text);
+  }
+  const note = noteParts.join("; ") || null;
+  if (!runs.length) return { raw, sets: [], note, ambiguous: false, error: "no reps found" };
+
+  // Every way to read the digit runs as exactly `sets` rep values (1–2 digits each).
+  let combos: { reps: number[]; weights: (number | null)[] }[] = [{ reps: [], weights: [] }];
+  for (const run of runs) {
+    const next: typeof combos = [];
+    for (const c of combos) {
+      for (const opt of tokenizations(run.text)) {
+        if (c.reps.length + opt.length > sets) continue;
+        next.push({
+          reps: [...c.reps, ...opt],
+          weights: [...c.weights, ...opt.map(() => run.weight)],
+        });
+      }
+      if (next.length > 5000) {
+        return { raw, sets: [], note, ambiguous: false, error: "too many possible readings" };
+      }
+    }
+    combos = next;
+  }
+  const complete = combos.filter((c) => c.reps.length === sets);
+  const plausible = complete.filter((c) => c.reps.every((r) => r >= 1 && r <= 30));
+  const readings = plausible.length ? plausible : complete;
+  if (!readings.length) {
+    return { raw, sets: [], note, ambiguous: false, error: `cannot split "${trimmed}" into ${sets} sets` };
+  }
+  const chosen = readings[0];
+  return {
+    raw,
+    sets: chosen.reps.map((reps, i) => ({ setNumber: i + 1, weight: chosen.weights[i], reps })),
+    note,
+    ambiguous: readings.length > 1,
+    error: null,
+  };
+}
+
+/** Manual correction input: "18,17,17,7,15" (any non-digit separator). */
+export function parseRepList(input: string, weight: number | null): ImportedSet[] {
+  return input
+    .split(/[^0-9]+/)
+    .filter(Boolean)
+    .map((t, i) => ({ setNumber: i + 1, weight, reps: parseInt(t, 10) }));
+}
+
+type CellEvent = { kind: "digits"; text: string } | { kind: "paren"; content: string };
+
+function tokenizeCell(raw: string): CellEvent[] {
+  const events: CellEvent[] = [];
+  let i = 0;
+  while (i < raw.length) {
+    const ch = raw[i];
+    if (ch === "(") {
+      const close = raw.indexOf(")", i);
+      events.push({ kind: "paren", content: close === -1 ? raw.slice(i + 1) : raw.slice(i + 1, close) });
+      i = close === -1 ? raw.length : close + 1;
+    } else if (/\d/.test(ch)) {
+      let j = i;
+      while (j < raw.length && /\d/.test(raw[j])) j++;
+      events.push({ kind: "digits", text: raw.slice(i, j) });
+      i = j;
+    } else {
+      i++; // separators: dots, commas, spaces, slashes
+    }
+  }
+  return events;
+}
+
+/** All splits of a digit string into 1–2 digit tokens (no zero / leading-zero reps). */
+function tokenizations(digits: string): number[][] {
+  if (digits === "") return [[]];
+  const out: number[][] = [];
+  for (const len of [1, 2]) {
+    if (digits.length < len) continue;
+    const head = digits.slice(0, len);
+    if (head.startsWith("0")) continue;
+    for (const rest of tokenizations(digits.slice(len))) out.push([parseInt(head, 10), ...rest]);
+  }
+  return out;
+}
+
+/** "25.05" | "25/05" → a Date at 12:00; future dates roll back one year. */
+function parseDate(cell: string, today: Date): Date | null {
+  const m = cell.trim().match(/^(\d{1,2})[./](\d{1,2})\.?$/);
+  if (!m) return null;
+  const dayNum = parseInt(m[1], 10);
+  const month = parseInt(m[2], 10);
+  if (dayNum < 1 || dayNum > 31 || month < 1 || month > 12) return null;
+  const date = new Date(today.getFullYear(), month - 1, dayNum, 12);
+  if (date.getTime() > today.getTime()) date.setFullYear(date.getFullYear() - 1);
+  return date;
+}
+
+function splitRows(text: string): string[][] {
+  const lines = text.replace(/\r/g, "").split("\n");
+  if (text.includes("\t")) return lines.map((l) => l.split("\t"));
+  return lines.map(parseCsvLine);
+}
+
+function parseCsvLine(line: string): string[] {
+  const cells: string[] = [];
+  let cur = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i];
+    if (quoted) {
+      if (ch === '"' && line[i + 1] === '"') {
+        cur += '"';
+        i++;
+      } else if (ch === '"') quoted = false;
+      else cur += ch;
+    } else if (ch === '"') quoted = true;
+    else if (ch === ",") {
+      cells.push(cur);
+      cur = "";
+    } else cur += ch;
+  }
+  cells.push(cur);
+  return cells;
+}
