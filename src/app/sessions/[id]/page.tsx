@@ -19,7 +19,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const toEntry = (l: (typeof logs)[number]): LogEntry => ({
     exerciseId: l.exerciseId,
     setNumber: l.setNumber,
-    weightKg: l.weightKg,
+    weight: l.weight,
     reps: l.reps,
     timeSeconds: l.timeSeconds,
   });

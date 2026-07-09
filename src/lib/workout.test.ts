@@ -84,10 +84,10 @@ describe("formatting", () => {
   });
 
   it("formats logged sets", () => {
-    expect(formatLoggedSet({ setNumber: 1, weightKg: 60, reps: 12, timeSeconds: null })).toBe("60×12");
-    expect(formatLoggedSet({ setNumber: 1, weightKg: 62.5, reps: 8, timeSeconds: null })).toBe("62.5×8");
-    expect(formatLoggedSet({ setNumber: 1, weightKg: null, reps: 15, timeSeconds: null })).toBe("15");
-    expect(formatLoggedSet({ setNumber: 1, weightKg: null, reps: null, timeSeconds: 40 })).toBe("40s");
+    expect(formatLoggedSet({ setNumber: 1, weight: 60, reps: 12, timeSeconds: null })).toBe("60×12");
+    expect(formatLoggedSet({ setNumber: 1, weight: 62.5, reps: 8, timeSeconds: null })).toBe("62.5×8");
+    expect(formatLoggedSet({ setNumber: 1, weight: null, reps: 15, timeSeconds: null })).toBe("15");
+    expect(formatLoggedSet({ setNumber: 1, weight: null, reps: null, timeSeconds: 40 })).toBe("40s");
   });
 
   it("formats clocks", () => {

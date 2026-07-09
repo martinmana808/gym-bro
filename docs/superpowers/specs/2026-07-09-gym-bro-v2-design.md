@@ -45,9 +45,10 @@ All changes are additive except one rename. Migrations via drizzle-kit.
   - `id` (pk), `session_id` (fk → sessions, cascade delete),
     `exercise_id` (fk → exercises, cascade delete), `note` text not null.
   - Unique on (`session_id`, `exercise_id`). Upsert semantics like `set_logs`.
-- Rename `set_logs.weight_kg` → `set_logs.weight` (column + TS property `weightKg`
-  → `weight`). The number is interpreted in the exercise's `weightUnit`. Mechanical
-  rename across queries, actions, runner, formatters.
+- Rename the TS property `weightKg` → `weight` (the DB column keeps its
+  historical `weight_kg` name via drizzle's name mapping — avoids an
+  interactive rename migration). The number is interpreted in the exercise's
+  `weightUnit`.
 
 ## Features
 

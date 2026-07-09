@@ -17,7 +17,7 @@ import {
 export type LogEntry = {
   exerciseId: string;
   setNumber: number;
-  weightKg: number | null;
+  weight: number | null;
   reps: number | null;
   timeSeconds: number | null;
 };
@@ -83,9 +83,9 @@ export function SessionRunner({
     const existing = logs.get(stepKey!);
     const prev = prevMap.get(stepKey!);
     const lastWeightThisSession = [...logs.values()]
-      .filter((l) => l.exerciseId === step.exercise.id && l.weightKg != null)
-      .at(-1)?.weightKg;
-    setWeight(`${existing?.weightKg ?? prev?.weightKg ?? lastWeightThisSession ?? ""}`);
+      .filter((l) => l.exerciseId === step.exercise.id && l.weight != null)
+      .at(-1)?.weight;
+    setWeight(`${existing?.weight ?? prev?.weight ?? lastWeightThisSession ?? ""}`);
     setReps(`${existing?.reps ?? prev?.reps ?? step.exercise.repsMin ?? ""}`);
     setSeconds(`${existing?.timeSeconds ?? prev?.timeSeconds ?? step.exercise.timeSeconds ?? ""}`);
   }
@@ -107,7 +107,7 @@ export function SessionRunner({
     const entry: LogEntry = {
       exerciseId: step.exercise.id,
       setNumber: step.setNumber,
-      weightKg: weight === "" ? null : Number(weight),
+      weight: weight === "" ? null : Number(weight),
       reps: isTime || reps === "" ? null : Number(reps),
       timeSeconds: isTime && seconds !== "" ? Number(seconds) : null,
     };

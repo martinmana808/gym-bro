@@ -78,7 +78,8 @@ export const setLogs = pgTable(
       .notNull()
       .references(() => exercises.id, { onDelete: "cascade" }),
     setNumber: integer("set_number").notNull(),
-    weightKg: real("weight_kg"),
+    // Column keeps its historical name; the number is in the exercise's weightUnit.
+    weight: real("weight_kg"),
     reps: integer("reps"),
     timeSeconds: integer("time_seconds"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),

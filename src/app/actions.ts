@@ -225,7 +225,7 @@ export type LogSetInput = {
   sessionId: string;
   exerciseId: string;
   setNumber: number;
-  weightKg: number | null;
+  weight: number | null;
   reps: number | null;
   timeSeconds: number | null;
 };
@@ -238,7 +238,7 @@ export async function logSet(input: LogSetInput) {
     sessionId: session.id,
     exerciseId: input.exerciseId,
     setNumber: input.setNumber,
-    weightKg: input.weightKg,
+    weight: input.weight,
     reps: input.reps,
     timeSeconds: input.timeSeconds,
   };
@@ -247,7 +247,7 @@ export async function logSet(input: LogSetInput) {
     .values(values)
     .onConflictDoUpdate({
       target: [schema.setLogs.sessionId, schema.setLogs.exerciseId, schema.setLogs.setNumber],
-      set: { weightKg: values.weightKg, reps: values.reps, timeSeconds: values.timeSeconds },
+      set: { weight: values.weight, reps: values.reps, timeSeconds: values.timeSeconds },
     });
 }
 

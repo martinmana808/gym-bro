@@ -77,7 +77,7 @@ export function formatTarget(e: RunnerExercise): string {
 
 export type LoggedSet = {
   setNumber: number;
-  weightKg: number | null;
+  weight: number | null;
   reps: number | null;
   timeSeconds: number | null;
 };
@@ -85,7 +85,7 @@ export type LoggedSet = {
 /** "60×12" | "12" | "45s" — one logged set. */
 export function formatLoggedSet(l: LoggedSet): string {
   if (l.timeSeconds != null) return formatSeconds(l.timeSeconds);
-  if (l.weightKg != null) return `${trimNumber(l.weightKg)}×${l.reps ?? "?"}`;
+  if (l.weight != null) return `${trimNumber(l.weight)}×${l.reps ?? "?"}`;
   return `${l.reps ?? "?"}`;
 }
 
