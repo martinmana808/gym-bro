@@ -90,6 +90,14 @@ describe("parseSpreadsheet", () => {
     const { days } = parseSpreadsheet("Day 1\tSets\tWeight\t24.12\nBench\t2\t60\t88", TODAY);
     expect(days[0].dates[0].getFullYear()).toBe(2025);
   });
+
+  it("keeps cells aligned to dates when a non-date column is interspersed", () => {
+    const sheet = "Day 1\tSets\tWeight\t25.05\t\t27.05\nBench\t2\t60\t88\t\t77";
+    const { days } = parseSpreadsheet(sheet, new Date(2026, 6, 9));
+    expect(days[0].dates.map((d) => d.getDate())).toEqual([25, 27]);
+    expect(days[0].exercises[0].cells[0]?.sets.map((s) => s.reps)).toEqual([8, 8]);
+    expect(days[0].exercises[0].cells[1]?.sets.map((s) => s.reps)).toEqual([7, 7]); // 27.05 column, not the blank
+  });
 });
 
 describe("parseRepList", () => {

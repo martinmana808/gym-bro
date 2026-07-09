@@ -33,18 +33,27 @@ export function parseSpreadsheet(text: string, today: Date = new Date()): ParseR
   let day: ImportedDay | null = null;
   let setsCol = -1;
   let prev: ImportedExercise | null = null;
+  let dateCols: number[] = [];
 
   for (const [rowIndex, row] of rows.entries()) {
     const si = row.findIndex((c) => /^sets$/i.test(c.trim()));
     if (si > 0) {
       // Header row starts a new day: "Day 1 | Sets | Weight | 25.05 | ..."
-      const dates = row
-        .slice(si + 2)
-        .map((c) => parseDate(c, today))
-        .filter((d): d is Date => d !== null);
+      // Track the ORIGINAL column offset for each kept date so a blank/non-date
+      // column between two dates doesn't shift later cell reads out of alignment.
+      const dates: Date[] = [];
+      const cols: number[] = [];
+      for (let c = si + 2; c < row.length; c++) {
+        const d = parseDate(row[c], today);
+        if (d) {
+          dates.push(d);
+          cols.push(c);
+        }
+      }
       day = { name: row[0].trim() || `Day ${days.length + 1}`, dates, exercises: [] };
       days.push(day);
       setsCol = si;
+      dateCols = cols;
       prev = null;
       continue;
     }
@@ -71,8 +80,8 @@ export function parseSpreadsheet(text: string, today: Date = new Date()): ParseR
       repsMin: w.repsMin,
       note: w.note,
       blockStart: blockStart || !prev,
-      cells: day.dates.map((_, i) => {
-        const raw = row[setsCol + 2 + i] ?? "";
+      cells: dateCols.map((col) => {
+        const raw = row[col] ?? "";
         return raw.trim() ? parseSessionCell(raw, sets, w.weight) : null;
       }),
     };

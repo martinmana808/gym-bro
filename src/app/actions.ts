@@ -329,89 +329,93 @@ export type ImportDayPayload = { name: string; dates: string[]; exercises: Impor
 export async function importSpreadsheet(days: ImportDayPayload[]) {
   const userId = await requireUserId();
   const db = await getDb();
-  for (const dayPayload of days) {
-    const [workout] = await db
-      .insert(schema.workouts)
-      .values({
-        userId,
-        name: dayPayload.name.trim().slice(0, 80) || "Imported workout",
-        defaultRestSeconds: 90,
-      })
-      .returning({ id: schema.workouts.id });
 
-    const sessionIds: string[] = [];
-    for (const iso of dayPayload.dates) {
-      const startedAt = new Date(iso);
-      if (Number.isNaN(startedAt.getTime())) throw new Error("Invalid date in import");
-      const [s] = await db
-        .insert(schema.sessions)
-        // finishedAt = startedAt: imported sessions are finished; duration unknown → renders "—".
-        .values({ workoutId: workout.id, userId, startedAt, finishedAt: startedAt })
-        .returning({ id: schema.sessions.id });
-      sessionIds.push(s.id);
-    }
+  await db.transaction(async (tx) => {
+    for (const dayPayload of days) {
+      const [workout] = await tx
+        .insert(schema.workouts)
+        .values({
+          userId,
+          name: dayPayload.name.trim().slice(0, 80) || "Imported workout",
+          defaultRestSeconds: 90,
+        })
+        .returning({ id: schema.workouts.id });
 
-    // Group merged-Sets rows into blocks; blocks hold at most 3 exercises.
-    const groups: ImportExercisePayload[][] = [];
-    for (const e of dayPayload.exercises) {
-      const last = groups.at(-1);
-      if (e.blockStart || !last || last.length >= 3) groups.push([e]);
-      else last.push(e);
-    }
+      const sessionIds: string[] = [];
+      for (const iso of dayPayload.dates) {
+        const startedAt = new Date(iso);
+        if (Number.isNaN(startedAt.getTime())) throw new Error("Invalid date in import");
+        const [s] = await tx
+          .insert(schema.sessions)
+          // finishedAt = startedAt: imported sessions are finished; duration unknown → renders "—".
+          .values({ workoutId: workout.id, userId, startedAt, finishedAt: startedAt })
+          .returning({ id: schema.sessions.id });
+        sessionIds.push(s.id);
+      }
 
-    for (const [position, group] of groups.entries()) {
-      const [block] = await db
-        .insert(schema.blocks)
-        .values({ workoutId: workout.id, position })
-        .returning({ id: schema.blocks.id });
-      for (const [j, e] of group.entries()) {
-        const sets = Math.min(20, Math.max(1, Math.round(e.sets) || 1));
-        const [exercise] = await db
-          .insert(schema.exercises)
-          .values({
-            blockId: block.id,
-            position: j,
-            name: e.name.trim().slice(0, 120),
-            sets,
-            measurement: "reps",
-            repScheme: e.repScheme === "failure" ? "failure" : "fixed",
-            repsMin:
-              e.repScheme === "failure"
-                ? null
-                : Math.min(999, Math.max(1, Math.round(e.repsMin ?? 10))),
-            repsMax: null,
-            timeSeconds: null,
-            restOverrideSeconds: null,
-            note: e.note?.trim().slice(0, 500) || null,
-            weightUnit: e.weightUnit === "bricks" ? "bricks" : "kg",
-          })
-          .returning({ id: schema.exercises.id });
+      // Group merged-Sets rows into blocks; blocks hold at most 3 exercises.
+      const groups: ImportExercisePayload[][] = [];
+      for (const e of dayPayload.exercises) {
+        const last = groups.at(-1);
+        if (e.blockStart || !last || last.length >= 3) groups.push([e]);
+        else last.push(e);
+      }
 
-        for (const [ci, cell] of e.cells.entries()) {
-          const sessionId = sessionIds[ci];
-          if (!cell || !sessionId) continue;
-          const logs = cell.sets
-            .filter((s) => s.setNumber >= 1 && s.setNumber <= sets)
-            .map((s) => ({
-              sessionId,
-              exerciseId: exercise.id,
-              setNumber: Math.round(s.setNumber),
-              weight: s.weight,
-              reps: s.reps == null ? null : Math.round(s.reps),
+      for (const [position, group] of groups.entries()) {
+        const [block] = await tx
+          .insert(schema.blocks)
+          .values({ workoutId: workout.id, position })
+          .returning({ id: schema.blocks.id });
+        for (const [j, e] of group.entries()) {
+          const sets = Math.min(20, Math.max(1, Math.round(e.sets) || 1));
+          const [exercise] = await tx
+            .insert(schema.exercises)
+            .values({
+              blockId: block.id,
+              position: j,
+              name: e.name.trim().slice(0, 120),
+              sets,
+              measurement: "reps",
+              repScheme: e.repScheme === "failure" ? "failure" : "fixed",
+              repsMin:
+                e.repScheme === "failure"
+                  ? null
+                  : Math.min(999, Math.max(1, Math.round(e.repsMin ?? 10))),
+              repsMax: null,
               timeSeconds: null,
-            }));
-          if (logs.length) await db.insert(schema.setLogs).values(logs);
-          if (cell.note?.trim()) {
-            await db.insert(schema.sessionNotes).values({
-              sessionId,
-              exerciseId: exercise.id,
-              note: cell.note.trim().slice(0, 500),
-            });
+              restOverrideSeconds: null,
+              note: e.note?.trim().slice(0, 500) || null,
+              weightUnit: e.weightUnit === "bricks" ? "bricks" : "kg",
+            })
+            .returning({ id: schema.exercises.id });
+
+          for (const [ci, cell] of e.cells.entries()) {
+            const sessionId = sessionIds[ci];
+            if (!cell || !sessionId) continue;
+            const logs = cell.sets
+              .filter((s) => s.setNumber >= 1 && s.setNumber <= sets)
+              .map((s) => ({
+                sessionId,
+                exerciseId: exercise.id,
+                setNumber: Math.round(s.setNumber),
+                weight: s.weight,
+                reps: s.reps == null ? null : Math.round(s.reps),
+                timeSeconds: null,
+              }));
+            if (logs.length) await tx.insert(schema.setLogs).values(logs);
+            if (cell.note?.trim()) {
+              await tx.insert(schema.sessionNotes).values({
+                sessionId,
+                exerciseId: exercise.id,
+                note: cell.note.trim().slice(0, 500),
+              });
+            }
           }
         }
       }
     }
-  }
+  });
+
   revalidatePath("/workouts");
   redirect("/workouts");
 }

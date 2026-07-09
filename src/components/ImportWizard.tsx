@@ -101,6 +101,12 @@ export function ImportWizard() {
               · {day.dates.length} session{day.dates.length === 1 ? "" : "s"}
             </span>
           </h2>
+          <p className="mt-1 text-xs text-zinc-500">
+            Sessions:{" "}
+            {day.dates
+              .map((d) => d.toLocaleDateString(undefined, { month: "short", day: "numeric" }))
+              .join(" · ")}
+          </p>
           <div className="mt-3 flex flex-col gap-3">
             {day.exercises.map((e, ei) => (
               <div key={ei} className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3">
