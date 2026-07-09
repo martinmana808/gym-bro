@@ -88,6 +88,9 @@ export default async function WorkoutsPage() {
         <Link href="/import" className="transition hover:text-zinc-300">
           Import spreadsheet
         </Link>
+        <a href="/api/export" className="transition hover:text-zinc-300">
+          Export CSV
+        </a>
       </div>
     </main>
   );
