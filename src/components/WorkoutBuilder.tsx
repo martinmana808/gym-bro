@@ -27,6 +27,7 @@ const emptyExercise = (): ExerciseDraft => ({
   timeSeconds: 30,
   restOverrideSeconds: null,
   note: null,
+  weightUnit: "kg" as const,
 });
 
 const field =
@@ -78,6 +79,7 @@ export function WorkoutBuilder({
           timeSeconds: e.timeSeconds,
           restOverrideSeconds: e.restOverrideSeconds,
           note: e.note,
+          weightUnit: e.weightUnit,
         })),
       })),
     };
@@ -231,6 +233,21 @@ export function WorkoutBuilder({
                     >
                       <option value="reps">Repetitions</option>
                       <option value="time">Time</option>
+                    </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-zinc-500">Weight unit</span>
+                    <select
+                      className={field}
+                      value={e.weightUnit}
+                      onChange={(ev) =>
+                        patchExercise(bi, ei, {
+                          weightUnit: ev.target.value as "kg" | "bricks",
+                        })
+                      }
+                    >
+                      <option value="kg">Kilograms</option>
+                      <option value="bricks">Bricks (machine stack)</option>
                     </select>
                   </label>
 

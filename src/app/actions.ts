@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { requireUserId } from "@/auth";
 import { getDb, schema } from "@/db";
 import type { Measurement, RepScheme } from "@/db/schema";
+import type { WeightUnit } from "@/lib/workout";
 
 export type ExerciseInput = {
   id?: string;
@@ -18,6 +19,7 @@ export type ExerciseInput = {
   timeSeconds: number | null;
   restOverrideSeconds: number | null;
   note: string | null;
+  weightUnit: WeightUnit;
 };
 
 export type BlockInput = { id?: string; exercises: ExerciseInput[] };
@@ -58,6 +60,7 @@ function sanitizeWorkout(input: WorkoutInput): WorkoutInput {
               ? null
               : int(e.restOverrideSeconds, 0, 3600, 0),
           note: e.note?.trim() ? e.note.trim().slice(0, 500) : null,
+          weightUnit: e.weightUnit === "bricks" ? ("bricks" as const) : ("kg" as const),
         })),
     }))
     .filter((b) => b.exercises.length > 0);
@@ -101,6 +104,7 @@ async function insertBlocks(workoutId: string, blocks: BlockInput[], startPos = 
         timeSeconds: e.timeSeconds,
         restOverrideSeconds: e.restOverrideSeconds,
         note: e.note,
+        weightUnit: e.weightUnit,
       })),
     );
   }
@@ -182,6 +186,7 @@ export async function updateWorkout(workoutId: string, input: WorkoutInput) {
         timeSeconds: e.timeSeconds,
         restOverrideSeconds: e.restOverrideSeconds,
         note: e.note,
+        weightUnit: e.weightUnit,
       };
       if (e.id && keptExerciseIds.has(e.id)) {
         await db.update(schema.exercises).set(values).where(eq(schema.exercises.id, e.id));

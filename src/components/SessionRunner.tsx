@@ -240,7 +240,7 @@ export function SessionRunner({
               </span>
               {prev && (
                 <span className="rounded-full bg-zinc-800/80 px-3 py-1 tabular-nums text-zinc-400">
-                  Last time {formatLoggedSet(prev)}
+                  Last time {formatLoggedSet(prev, step.exercise.weightUnit)}
                 </span>
               )}
             </div>
@@ -262,20 +262,25 @@ export function SessionRunner({
             />
           </div>
 
-          <div className="flex flex-col gap-3">
-            <NumberField
-              label="Weight (kg)"
-              value={weight}
-              onChange={setWeight}
-              step={2.5}
-              decimal
-            />
-            {step.exercise.measurement === "reps" ? (
-              <NumberField label="Reps" value={reps} onChange={setReps} step={1} />
-            ) : (
-              <NumberField label="Seconds" value={seconds} onChange={setSeconds} step={5} />
-            )}
-          </div>
+          {(() => {
+            const unit = step.exercise.weightUnit;
+            return (
+              <div className="flex flex-col gap-3">
+                <NumberField
+                  label={unit === "bricks" ? "Weight (bricks)" : "Weight (kg)"}
+                  value={weight}
+                  onChange={setWeight}
+                  step={unit === "bricks" ? 1 : 2.5}
+                  decimal={unit !== "bricks"}
+                />
+                {step.exercise.measurement === "reps" ? (
+                  <NumberField label="Reps" value={reps} onChange={setReps} step={1} />
+                ) : (
+                  <NumberField label="Seconds" value={seconds} onChange={setSeconds} step={5} />
+                )}
+              </div>
+            );
+          })()}
 
           {error && <p className="text-sm text-red-400">{error}</p>}
 
