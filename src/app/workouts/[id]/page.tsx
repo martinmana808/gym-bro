@@ -3,7 +3,13 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/auth";
 import { getUnfinishedSession, getWorkoutHistory, getWorkoutStructure } from "@/db/queries";
 import { deleteWorkout, startSession } from "@/app/actions";
-import { blockLabel, formatLoggedSet, formatSeconds, formatTarget } from "@/lib/workout";
+import {
+  blockLabel,
+  formatCurrentWeight,
+  formatSeconds,
+  formatSessionCell,
+  formatTarget,
+} from "@/lib/workout";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +31,15 @@ export default async function WorkoutDetailPage({
   // Oldest → newest, like the week columns of the spreadsheet.
   const columns = [...history.sessions].reverse();
   const exercisesInOrder = blocks.flatMap((b) => b.exercises);
+  const currentWeight = (exerciseId: string): number | null => {
+    for (const s of history.sessions) {
+      const w = (history.logsBySession[s.id] ?? [])
+        .filter((l) => l.exerciseId === exerciseId && l.weight != null)
+        .at(-1)?.weight;
+      if (w != null) return w;
+    }
+    return null;
+  };
 
   return (
     <main className="mx-auto flex w-full max-w-2xl flex-1 flex-col gap-6 px-4 pb-10 pt-6">
@@ -114,6 +129,7 @@ export default async function WorkoutDetailPage({
                 <tr className="border-b border-zinc-800 bg-zinc-900/60 text-left text-zinc-400">
                   <th className="px-3 py-2.5 font-medium">Exercise</th>
                   <th className="px-3 py-2.5 font-medium">Target</th>
+                  <th className="px-3 py-2.5 font-medium">Weight</th>
                   {columns.map((s) => (
                     <th key={s.id} className="px-3 py-2.5 font-medium">
                       <Link href={`/sessions/${s.id}`} className="transition hover:text-lime-400">
@@ -134,13 +150,24 @@ export default async function WorkoutDetailPage({
                   >
                     <td className="px-3 py-2.5 font-medium">{e.name}</td>
                     <td className="px-3 py-2.5 text-zinc-400">{formatTarget(e)}</td>
+                    <td className="px-3 py-2.5 tabular-nums text-zinc-300">
+                      {formatCurrentWeight(currentWeight(e.id), e.weightUnit)}
+                    </td>
                     {columns.map((s) => {
                       const logs = (history.logsBySession[s.id] ?? []).filter(
                         (l) => l.exerciseId === e.id,
                       );
+                      const note = (history.notesBySession[s.id] ?? []).find(
+                        (n) => n.exerciseId === e.id,
+                      )?.note;
                       return (
                         <td key={s.id} className="whitespace-nowrap px-3 py-2.5 tabular-nums">
-                          {logs.length ? logs.map((l) => formatLoggedSet(l)).join(" · ") : "—"}
+                          {formatSessionCell(logs, e.weightUnit, currentWeight(e.id))}
+                          {note && (
+                            <span title={note} className="ml-0.5 cursor-help text-lime-400">
+                              *
+                            </span>
+                          )}
                         </td>
                       );
                     })}

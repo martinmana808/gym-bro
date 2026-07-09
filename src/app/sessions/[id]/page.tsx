@@ -72,7 +72,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       <div className="grid grid-cols-2 gap-3 text-center">
         <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
           <p className="text-3xl font-bold tabular-nums tracking-tight">
-            {formatClock(durationSeconds)}
+            {durationSeconds > 0 ? formatClock(durationSeconds) : "—"}
           </p>
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
             duration
