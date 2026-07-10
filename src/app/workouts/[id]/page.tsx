@@ -31,6 +31,19 @@ export default async function WorkoutDetailPage({
   // Oldest → newest, like the week columns of the spreadsheet.
   const columns = [...history.sessions].reverse();
   const exercisesInOrder = blocks.flatMap((b) => b.exercises);
+  // Which block each exercise belongs to, so the history table can mark
+  // supersets/trisets the same way the plan groups them.
+  const groupOf = new Map<string, { size: number; label: string; firstId: string; lastId: string }>();
+  for (const b of blocks) {
+    for (const e of b.exercises) {
+      groupOf.set(e.id, {
+        size: b.exercises.length,
+        label: blockLabel(b.exercises.length),
+        firstId: b.exercises[0].id,
+        lastId: b.exercises[b.exercises.length - 1].id,
+      });
+    }
+  }
   const currentWeight = (exerciseId: string): number | null => {
     for (const s of history.sessions) {
       const w = (history.logsBySession[s.id] ?? [])
@@ -91,8 +104,8 @@ export default async function WorkoutDetailPage({
               className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4"
             >
               {block.exercises.length > 1 && (
-                <p className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
-                  {blockLabel(block.exercises.length)} — no rest in between
+                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                  {blockLabel(block.exercises.length)}
                 </p>
               )}
               {block.exercises.map((e) => (
@@ -143,12 +156,26 @@ export default async function WorkoutDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {exercisesInOrder.map((e) => (
+                {exercisesInOrder.map((e) => {
+                  const group = groupOf.get(e.id);
+                  const grouped = (group?.size ?? 1) > 1;
+                  return (
                   <tr
                     key={e.id}
                     className="border-b border-zinc-800/60 last:border-0 even:bg-zinc-900/30"
                   >
-                    <td className="px-3 py-2.5 font-medium">{e.name}</td>
+                    <td
+                      className={`px-3 py-2.5 font-medium ${
+                        grouped ? "border-l-2 border-lime-400/50" : ""
+                      }`}
+                    >
+                      {e.name}
+                      {grouped && group?.firstId === e.id && (
+                        <span className="ml-2 rounded bg-lime-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-400/80">
+                          {group.label}
+                        </span>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-zinc-400">{formatTarget(e)}</td>
                     <td className="px-3 py-2.5 tabular-nums text-zinc-300">
                       {formatCurrentWeight(currentWeight(e.id), e.weightUnit)}
@@ -172,7 +199,8 @@ export default async function WorkoutDetailPage({
                       );
                     })}
                   </tr>
-                ))}
+                  );
+                })}
               </tbody>
             </table>
           </div>
