@@ -5,6 +5,7 @@ import { getUnfinishedSession, getWorkoutHistory, getWorkoutStructure } from "@/
 import { deleteWorkout, startSession } from "@/app/actions";
 import {
   blockLabel,
+  formatClock,
   formatCurrentWeight,
   formatSeconds,
   formatSessionCell,
@@ -143,16 +144,27 @@ export default async function WorkoutDetailPage({
                   <th className="px-3 py-2.5 font-medium">Exercise</th>
                   <th className="px-3 py-2.5 font-medium">Target</th>
                   <th className="px-3 py-2.5 font-medium">Weight</th>
-                  {columns.map((s) => (
-                    <th key={s.id} className="px-3 py-2.5 font-medium">
-                      <Link href={`/sessions/${s.id}`} className="transition hover:text-lime-400">
-                        {s.startedAt.toLocaleDateString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </Link>
-                    </th>
-                  ))}
+                  {columns.map((s) => {
+                    const durationSeconds = s.finishedAt
+                      ? (s.finishedAt.getTime() - s.startedAt.getTime()) / 1000
+                      : 0;
+                    return (
+                      <th key={s.id} className="px-3 py-2 font-medium align-top">
+                        <Link
+                          href={`/sessions/${s.id}`}
+                          className="block transition hover:text-lime-400"
+                        >
+                          {s.startedAt.toLocaleDateString(undefined, {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          <span className="block text-[11px] font-normal tabular-nums text-zinc-500">
+                            {durationSeconds > 0 ? formatClock(durationSeconds) : "—"}
+                          </span>
+                        </Link>
+                      </th>
+                    );
+                  })}
                 </tr>
               </thead>
               <tbody>
