@@ -444,6 +444,8 @@ export type ImportProgramDay = { name: string; exercises: ImportProgramExercise[
 
 export async function importProgram(programName: string, days: ImportProgramDay[]) {
   const userId = await requireUserId();
+  // Nothing to import (e.g. a direct call with an empty parse) — don't create an orphan program.
+  if (!days.some((d) => d.exercises.some((e) => e.name.trim()))) redirect("/import");
   const db = await getDb();
   let firstDayId = "";
   await db.transaction(async (tx) => {
