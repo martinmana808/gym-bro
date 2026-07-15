@@ -1,6 +1,6 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
-import type { Block, Exercise, Session, SessionNote, SetLog, Workout } from "@/db/schema";
+import type { Block, Exercise, Session, SessionNote, SetLog, Variation, Workout } from "@/db/schema";
 import { groupExercisesIntoBlocks } from "@/lib/workout";
 
 export type WorkoutStructure = {
@@ -31,25 +31,68 @@ async function dayView(dayId: string, userId: string) {
   return { day, program, variation, workout };
 }
 
-export async function getWorkoutStructure(
-  dayId: string,
-  userId: string,
-): Promise<WorkoutStructure | null> {
+async function ownedDayWorkout(dayId: string, userId: string): Promise<Workout | null> {
   const db = await getDb();
-  const view = await dayView(dayId, userId);
-  if (!view) return null;
-  const exercises = view.variation
-    ? await db.query.exercises.findMany({
-        where: eq(schema.exercises.variationId, view.variation.id),
-        orderBy: asc(schema.exercises.position),
-      })
-    : [];
+  const day = await db.query.days.findFirst({ where: eq(schema.days.id, dayId) });
+  if (!day) return null;
+  const program = await db.query.programs.findFirst({
+    where: and(eq(schema.programs.id, day.programId), eq(schema.programs.userId, userId)),
+  });
+  if (!program) return null;
+  return {
+    id: day.id,
+    userId: program.userId,
+    name: day.name,
+    defaultRestSeconds: day.defaultRestSeconds,
+    createdAt: program.createdAt,
+  };
+}
+
+export async function listDayVariations(dayId: string, userId: string): Promise<Variation[]> {
+  const db = await getDb();
+  const workout = await ownedDayWorkout(dayId, userId);
+  if (!workout) return [];
+  return db.query.variations.findMany({
+    where: eq(schema.variations.dayId, dayId),
+    orderBy: asc(schema.variations.position),
+  });
+}
+
+export async function getVariationStructure(
+  variationId: string,
+  userId: string,
+): Promise<(WorkoutStructure & { variation: Variation }) | null> {
+  const db = await getDb();
+  const variation = await db.query.variations.findFirst({
+    where: eq(schema.variations.id, variationId),
+  });
+  if (!variation) return null;
+  const workout = await ownedDayWorkout(variation.dayId, userId);
+  if (!workout) return null;
+  const exercises = await db.query.exercises.findMany({
+    where: eq(schema.exercises.variationId, variationId),
+    orderBy: asc(schema.exercises.position),
+  });
   const blocks = groupExercisesIntoBlocks(exercises).map((g, i) => ({
     id: g.key,
     position: i,
     exercises: g.exercises,
   }));
-  return { workout: view.workout, blocks };
+  return { workout, blocks, variation };
+}
+
+export async function getWorkoutStructure(
+  dayId: string,
+  userId: string,
+): Promise<WorkoutStructure | null> {
+  const db = await getDb();
+  const first = await db.query.variations.findFirst({
+    where: eq(schema.variations.dayId, dayId),
+    orderBy: asc(schema.variations.position),
+  });
+  if (first) return getVariationStructure(first.id, userId);
+  const workout = await ownedDayWorkout(dayId, userId);
+  return workout ? { workout, blocks: [] } : null;
 }
 
 export type WorkoutListItem = Workout & {
@@ -116,6 +159,7 @@ export type WorkoutHistory = {
   sessions: Session[]; // most recent first, finished only
   logsBySession: Record<string, SetLog[]>;
   notesBySession: Record<string, SessionNote[]>;
+  variationNameBySession: Record<string, string>;
 };
 
 export async function getWorkoutHistory(dayId: string, limit = 6): Promise<WorkoutHistory> {
@@ -140,7 +184,14 @@ export async function getWorkoutHistory(dayId: string, limit = 6): Promise<Worko
     : [];
   const notesBySession: Record<string, SessionNote[]> = {};
   for (const s of finished) notesBySession[s.id] = notes.filter((n) => n.sessionId === s.id);
-  return { sessions: finished, logsBySession, notesBySession };
+  const variationIds = [...new Set(finished.map((s) => s.variationId))];
+  const vars = variationIds.length
+    ? await db.query.variations.findMany({ where: inArray(schema.variations.id, variationIds) })
+    : [];
+  const nameById = new Map(vars.map((v) => [v.id, v.name]));
+  const variationNameBySession: Record<string, string> = {};
+  for (const s of finished) variationNameBySession[s.id] = nameById.get(s.variationId) ?? "";
+  return { sessions: finished, logsBySession, notesBySession, variationNameBySession };
 }
 
 export async function getUnfinishedSession(dayId: string, userId: string) {
@@ -174,7 +225,7 @@ export async function getSessionData(
     where: and(eq(schema.sessions.id, sessionId), eq(schema.sessions.userId, userId)),
   });
   if (!session) return null;
-  const structure = await getWorkoutStructure(session.dayId, userId);
+  const structure = await getVariationStructure(session.variationId, userId);
   if (!structure) return null;
   const logs = await db.query.setLogs.findMany({
     where: eq(schema.setLogs.sessionId, sessionId),
