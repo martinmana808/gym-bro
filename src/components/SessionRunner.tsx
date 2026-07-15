@@ -93,7 +93,7 @@ export function SessionRunner({
       .filter((l) => l.exerciseId === step.exercise.id && l.weight != null)
       .at(-1)?.weight;
     setWeight(
-      `${existing?.weight ?? step.exercise.targetWeight ?? prev?.weight ?? lastWeightThisSession ?? ""}`,
+      `${existing?.weight ?? lastWeightThisSession ?? step.exercise.targetWeight ?? prev?.weight ?? ""}`,
     );
     setReps(`${existing?.reps ?? prev?.reps ?? step.exercise.repsMin ?? ""}`);
     setSeconds(`${existing?.timeSeconds ?? prev?.timeSeconds ?? step.exercise.timeSeconds ?? ""}`);

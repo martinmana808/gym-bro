@@ -63,7 +63,12 @@ function sanitizeWorkout(input: WorkoutInput): WorkoutInput {
               : int(e.restOverrideSeconds, 0, 3600, 0),
           note: e.note?.trim() ? e.note.trim().slice(0, 500) : null,
           weightUnit: e.weightUnit === "bricks" ? ("bricks" as const) : ("kg" as const),
-          targetWeight: e.targetWeight == null || `${e.targetWeight}` === "" ? null : Math.max(0, Number(e.targetWeight)) || null,
+          targetWeight:
+            e.targetWeight == null || `${e.targetWeight}` === ""
+              ? null
+              : Number.isFinite(Number(e.targetWeight))
+                ? Math.max(0, Number(e.targetWeight))
+                : null,
         })),
     }))
     .filter((b) => b.exercises.length > 0);
