@@ -67,7 +67,12 @@ export function VariationsBar({
             <form
               action={deleteVariation.bind(null, active.id)}
               onSubmit={(e) => {
-                if (!confirm(`Delete variation "${active.name}"?`)) e.preventDefault();
+                if (
+                  !confirm(
+                    `Delete variation "${active.name}" and all its logged sessions? This cannot be undone.`,
+                  )
+                )
+                  e.preventDefault();
               }}
             >
               <button className="transition hover:text-red-400">Delete</button>

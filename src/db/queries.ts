@@ -231,7 +231,11 @@ export async function getSessionData(
     where: eq(schema.setLogs.sessionId, sessionId),
   });
   const previous = await db.query.sessions.findMany({
-    where: and(eq(schema.sessions.dayId, session.dayId), eq(schema.sessions.userId, userId)),
+    where: and(
+      eq(schema.sessions.dayId, session.dayId),
+      eq(schema.sessions.variationId, session.variationId),
+      eq(schema.sessions.userId, userId),
+    ),
     orderBy: desc(schema.sessions.startedAt),
   });
   const prev = previous.find((s) => s.finishedAt && s.startedAt < session.startedAt);

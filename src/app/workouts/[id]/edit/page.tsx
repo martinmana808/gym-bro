@@ -16,11 +16,9 @@ export default async function EditWorkoutPage({
   const { id } = await params;
   const { v } = await searchParams;
   const userId = await requireUserId();
-  let variationId = v;
-  if (!variationId) {
-    const variations = await listDayVariations(id, userId);
-    variationId = variations[0]?.id;
-  }
+  const variations = await listDayVariations(id, userId);
+  const variationId =
+    (v && variations.some((va) => va.id === v) ? v : undefined) ?? variations[0]?.id;
   if (!variationId) notFound();
   const structure = await getVariationStructure(variationId, userId);
   if (!structure) notFound();
