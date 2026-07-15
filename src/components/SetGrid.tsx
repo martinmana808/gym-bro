@@ -62,8 +62,10 @@ export function SetGrid({
                           ? entry.timeSeconds != null
                             ? formatSeconds(entry.timeSeconds)
                             : entry.weight != null
-                              ? `${formatWeight(entry.weight, e.weightUnit)}×${entry.reps ?? "?"}`
-                              : `${entry.reps ?? "?"}`
+                              ? `${formatWeight(entry.weight, e.weightUnit)}×${entry.hitTarget ? "OK" : (entry.reps ?? "?")}`
+                              : entry.hitTarget
+                                ? "OK"
+                                : `${entry.reps ?? "?"}`
                           : "·"}
                       </button>
                     );

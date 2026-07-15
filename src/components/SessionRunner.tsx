@@ -122,16 +122,18 @@ export function SessionRunner({
     }
   }, [resting, restRemaining]);
 
-  const submitSet = async () => {
+  const submitSet = async (over?: { reps?: number; ok?: boolean }) => {
     primeAudio();
     if (!step) return;
     const isTime = step.exercise.measurement === "time";
+    const repsValue = over?.reps ?? (reps === "" ? null : Number(reps));
     const entry: LogEntry = {
       exerciseId: step.exercise.id,
       setNumber: step.setNumber,
       weight: weight === "" ? null : Number(weight),
-      reps: isTime || reps === "" ? null : Number(reps),
+      reps: isTime ? null : repsValue,
       timeSeconds: isTime && seconds !== "" ? Number(seconds) : null,
+      hitTarget: over?.ok ?? false,
     };
     setSaving(true);
     setError(null);
@@ -307,10 +309,44 @@ export function SessionRunner({
             );
           })()}
 
+          {step.exercise.measurement === "reps" && (
+            <div className="flex flex-wrap gap-2">
+              {step.exercise.repScheme === "fixed" && step.exercise.repsMin != null && (
+                <button
+                  type="button"
+                  onClick={() => submitSet({ reps: step.exercise.repsMin!, ok: true })}
+                  disabled={saving}
+                  className="rounded-xl bg-lime-400/15 px-4 py-2 text-sm font-semibold text-lime-400 transition hover:bg-lime-400/25 disabled:opacity-50"
+                >
+                  OK ({step.exercise.repsMin})
+                </button>
+              )}
+              {step.exercise.repScheme === "range" &&
+                step.exercise.repsMin != null &&
+                step.exercise.repsMax != null &&
+                Array.from(
+                  { length: Math.max(0, step.exercise.repsMax - step.exercise.repsMin + 1) },
+                  (_, i) => step.exercise.repsMin! + i,
+                )
+                  .slice(0, 12)
+                  .map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => submitSet({ reps: r })}
+                      disabled={saving}
+                      className="rounded-xl bg-zinc-800 px-4 py-2 text-sm font-semibold text-zinc-100 transition hover:bg-zinc-700 disabled:opacity-50"
+                    >
+                      {r}
+                    </button>
+                  ))}
+            </div>
+          )}
+
           {error && <p className="text-sm text-red-400">{error}</p>}
 
           <button
-            onClick={submitSet}
+            onClick={() => submitSet()}
             disabled={saving || discarding}
             className="rounded-2xl bg-lime-400 py-4 text-lg font-bold text-zinc-950 shadow-lg shadow-lime-400/20 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
           >
