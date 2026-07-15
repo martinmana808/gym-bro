@@ -85,6 +85,7 @@ export type LoggedSet = {
   weight: number | null;
   reps: number | null;
   timeSeconds: number | null;
+  hitTarget?: boolean;
 };
 
 /** One logged set addressed to its exercise — the runner/grid data shape. */
@@ -94,6 +95,7 @@ export type SetEntry = {
   weight: number | null;
   reps: number | null;
   timeSeconds: number | null;
+  hitTarget?: boolean;
 };
 
 /** "72" | "22.5" | "20br" — a bare weight value with the bricks suffix. */
@@ -115,8 +117,9 @@ export function formatTargetWeight(e: { targetWeight: number | null; weightUnit:
 /** "60×12" | "20br×8" | "12" | "45s" — one logged set. */
 export function formatLoggedSet(l: LoggedSet, unit: WeightUnit = "kg"): string {
   if (l.timeSeconds != null) return formatSeconds(l.timeSeconds);
-  if (l.weight != null) return `${formatWeight(l.weight, unit)}×${l.reps ?? "?"}`;
-  return `${l.reps ?? "?"}`;
+  const reps = l.hitTarget ? "OK" : `${l.reps ?? "?"}`;
+  if (l.weight != null) return `${formatWeight(l.weight, unit)}×${reps}`;
+  return reps;
 }
 
 /**
@@ -138,7 +141,9 @@ export function formatSessionCell(
       parts.push(`(${formatWeight(l.weight, unit)})`);
       prevWeight = l.weight;
     }
-    parts.push(l.timeSeconds != null ? formatSeconds(l.timeSeconds) : `${l.reps ?? "?"}`);
+    parts.push(
+      l.timeSeconds != null ? formatSeconds(l.timeSeconds) : l.hitTarget ? "OK" : `${l.reps ?? "?"}`,
+    );
   }
   let out = parts[0];
   for (let i = 1; i < parts.length; i++) {

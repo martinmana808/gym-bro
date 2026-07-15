@@ -179,6 +179,18 @@ describe("formatSessionCell", () => {
   });
 });
 
+describe("hit-target (OK) rendering", () => {
+  it("formatLoggedSet shows OK for a hit-target set", () => {
+    expect(formatLoggedSet({ setNumber: 1, weight: 60, reps: 8, timeSeconds: null, hitTarget: true }, "kg")).toBe("60×OK");
+    expect(formatLoggedSet({ setNumber: 1, weight: null, reps: 12, timeSeconds: null, hitTarget: true })).toBe("OK");
+    expect(formatLoggedSet({ setNumber: 1, weight: 60, reps: 8, timeSeconds: null, hitTarget: false }, "kg")).toBe("60×8");
+  });
+  it("formatSessionCell shows OK in the reps position for hit-target sets", () => {
+    const set = (setNumber: number, reps: number, hitTarget: boolean) => ({ setNumber, weight: 60, reps, timeSeconds: null, hitTarget });
+    expect(formatSessionCell([set(1, 8, true), set(2, 8, true), set(3, 6, false)], "kg", 60)).toBe("OK·OK·6");
+  });
+});
+
 describe("groupExercisesIntoBlocks", () => {
   const ex = (id: string, supersetKey: string | null) => ({ id, supersetKey });
 

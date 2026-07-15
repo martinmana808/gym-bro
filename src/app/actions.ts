@@ -346,6 +346,7 @@ export type LogSetInput = {
   weight: number | null;
   reps: number | null;
   timeSeconds: number | null;
+  hitTarget?: boolean;
 };
 
 export async function logSet(input: LogSetInput) {
@@ -359,13 +360,19 @@ export async function logSet(input: LogSetInput) {
     weight: input.weight,
     reps: input.reps,
     timeSeconds: input.timeSeconds,
+    hitTarget: input.hitTarget ?? false,
   };
   await db
     .insert(schema.setLogs)
     .values(values)
     .onConflictDoUpdate({
       target: [schema.setLogs.sessionId, schema.setLogs.exerciseId, schema.setLogs.setNumber],
-      set: { weight: values.weight, reps: values.reps, timeSeconds: values.timeSeconds },
+      set: {
+        weight: values.weight,
+        reps: values.reps,
+        timeSeconds: values.timeSeconds,
+        hitTarget: values.hitTarget,
+      },
     });
 }
 
