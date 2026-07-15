@@ -23,6 +23,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     weight: l.weight,
     reps: l.reps,
     timeSeconds: l.timeSeconds,
+    hitTarget: l.hitTarget,
   });
 
   if (!session.finishedAt) {
