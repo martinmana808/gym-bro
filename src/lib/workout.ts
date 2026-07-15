@@ -14,6 +14,7 @@ export type RunnerExercise = {
   restOverrideSeconds: number | null;
   note: string | null;
   weightUnit: WeightUnit;
+  targetWeight: number | null;
 };
 
 export type RunnerBlock = {
@@ -104,6 +105,11 @@ export function formatWeight(w: number, unit: WeightUnit): string {
 export function formatCurrentWeight(w: number | null, unit: WeightUnit): string {
   if (w == null) return "—";
   return `${trimNumber(w)} ${unit === "bricks" ? "br" : "kg"}`;
+}
+
+/** "60 kg" | "20 br" | "—" — a labelled per-exercise target weight. */
+export function formatTargetWeight(e: { targetWeight: number | null; weightUnit: WeightUnit }): string {
+  return formatCurrentWeight(e.targetWeight, e.weightUnit);
 }
 
 /** "60×12" | "20br×8" | "12" | "45s" — one logged set. */

@@ -7,6 +7,7 @@ import {
   formatSeconds,
   formatSessionCell,
   formatTarget,
+  formatTargetWeight,
   formatWeight,
   groupExercisesIntoBlocks,
   type LoggedSet,
@@ -25,6 +26,7 @@ const ex = (over: Partial<RunnerExercise>): RunnerExercise => ({
   restOverrideSeconds: null,
   note: null,
   weightUnit: "kg",
+  targetWeight: null,
   ...over,
 });
 
@@ -125,6 +127,14 @@ describe("weight units", () => {
   it("formats logged sets per unit", () => {
     expect(formatLoggedSet(set(1, 72, 8), "kg")).toBe("72×8");
     expect(formatLoggedSet(set(1, 20, 8), "bricks")).toBe("20br×8");
+  });
+});
+
+describe("formatTargetWeight", () => {
+  it("labels the target weight or shows a dash", () => {
+    expect(formatTargetWeight({ targetWeight: 60, weightUnit: "kg" })).toBe("60 kg");
+    expect(formatTargetWeight({ targetWeight: 20, weightUnit: "bricks" })).toBe("20 br");
+    expect(formatTargetWeight({ targetWeight: null, weightUnit: "kg" })).toBe("—");
   });
 });
 

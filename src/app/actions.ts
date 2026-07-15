@@ -20,9 +20,10 @@ export type ExerciseInput = {
   restOverrideSeconds: number | null;
   note: string | null;
   weightUnit: WeightUnit;
+  targetWeight?: number | null;
 };
 
-export type BlockInput = { id?: string; exercises: ExerciseInput[] };
+export type BlockInput = { id?: string; sectionName?: string | null; exercises: ExerciseInput[] };
 
 export type WorkoutInput = {
   name: string;
@@ -38,6 +39,7 @@ function sanitizeWorkout(input: WorkoutInput): WorkoutInput {
   const blocks = input.blocks
     .map((b) => ({
       id: b.id,
+      sectionName: b.sectionName?.trim() ? b.sectionName.trim().slice(0, 40) : null,
       exercises: b.exercises
         .filter((e) => e.name.trim().length > 0)
         .slice(0, 3)
@@ -61,6 +63,7 @@ function sanitizeWorkout(input: WorkoutInput): WorkoutInput {
               : int(e.restOverrideSeconds, 0, 3600, 0),
           note: e.note?.trim() ? e.note.trim().slice(0, 500) : null,
           weightUnit: e.weightUnit === "bricks" ? ("bricks" as const) : ("kg" as const),
+          targetWeight: e.targetWeight == null || `${e.targetWeight}` === "" ? null : Math.max(0, Number(e.targetWeight)) || null,
         })),
     }))
     .filter((b) => b.exercises.length > 0);
@@ -82,7 +85,7 @@ function flattenBlockExercises(blocks: BlockInput[], variationId: string) {
         variationId,
         position: i * 1000 + j,
         lineageId: crypto.randomUUID(),
-        sectionName: null,
+        sectionName: block.sectionName ?? null,
         supersetKey,
         name: e.name,
         sets: e.sets,
@@ -94,7 +97,7 @@ function flattenBlockExercises(blocks: BlockInput[], variationId: string) {
         restOverrideSeconds: e.restOverrideSeconds,
         note: e.note,
         weightUnit: e.weightUnit,
-        targetWeight: null,
+        targetWeight: e.targetWeight ?? null,
       });
     });
   });
@@ -249,7 +252,7 @@ export async function updateVariation(variationId: string, input: WorkoutInput) 
     for (const [j, e] of block.exercises.entries()) {
       const common = {
         position: i * 1000 + j,
-        sectionName: null,
+        sectionName: block.sectionName ?? null,
         supersetKey,
         name: e.name,
         sets: e.sets,
@@ -261,6 +264,7 @@ export async function updateVariation(variationId: string, input: WorkoutInput) 
         restOverrideSeconds: e.restOverrideSeconds,
         note: e.note,
         weightUnit: e.weightUnit,
+        targetWeight: e.targetWeight ?? null,
       };
       if (e.id && keptIds.has(e.id)) {
         await db.update(schema.exercises).set(common).where(eq(schema.exercises.id, e.id));
@@ -269,7 +273,6 @@ export async function updateVariation(variationId: string, input: WorkoutInput) 
           ...common,
           variationId,
           lineageId: crypto.randomUUID(),
-          targetWeight: null,
         });
       }
     }
