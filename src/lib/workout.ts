@@ -167,3 +167,21 @@ function trimNumber(n: number): string {
 export function blockLabel(size: number): string {
   return size === 3 ? "Triset" : size === 2 ? "Superset" : "Exercise";
 }
+
+/**
+ * Group a flat, ordered exercise list into superset blocks: consecutive
+ * exercises sharing the same non-null `supersetKey` become one group; a null
+ * key (or a change of key) starts a new group. Order is preserved.
+ */
+export function groupExercisesIntoBlocks<T extends { supersetKey: string | null }>(
+  exercises: T[],
+): { key: string; exercises: T[] }[] {
+  const groups: { key: string; exercises: T[] }[] = [];
+  for (const [i, e] of exercises.entries()) {
+    const last = groups.at(-1);
+    const sameBlock = last && e.supersetKey != null && last.key === e.supersetKey;
+    if (sameBlock) last.exercises.push(e);
+    else groups.push({ key: e.supersetKey ?? `solo-${i}`, exercises: [e] });
+  }
+  return groups;
+}

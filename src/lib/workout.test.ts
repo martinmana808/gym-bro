@@ -8,6 +8,7 @@ import {
   formatSessionCell,
   formatTarget,
   formatWeight,
+  groupExercisesIntoBlocks,
   type LoggedSet,
   type RunnerExercise,
 } from "./workout";
@@ -165,5 +166,33 @@ describe("formatSessionCell", () => {
   it("sorts by set number and handles empty input", () => {
     expect(formatSessionCell([set(2, 68, 6), set(1, 68, 8)], "kg", 68)).toBe("8·6");
     expect(formatSessionCell([], "kg", null)).toBe("—");
+  });
+});
+
+describe("groupExercisesIntoBlocks", () => {
+  const ex = (id: string, supersetKey: string | null) => ({ id, supersetKey });
+
+  it("keeps standalone exercises (null key) in their own group", () => {
+    const groups = groupExercisesIntoBlocks([ex("a", null), ex("b", null)]);
+    expect(groups.map((g) => g.exercises.map((e) => e.id))).toEqual([["a"], ["b"]]);
+  });
+
+  it("groups consecutive exercises sharing a key", () => {
+    const groups = groupExercisesIntoBlocks([
+      ex("a", null),
+      ex("b", "k1"),
+      ex("c", "k1"),
+      ex("d", null),
+    ]);
+    expect(groups.map((g) => g.exercises.map((e) => e.id))).toEqual([["a"], ["b", "c"], ["d"]]);
+  });
+
+  it("does not merge non-adjacent groups with the same key", () => {
+    const groups = groupExercisesIntoBlocks([ex("a", "k1"), ex("b", null), ex("c", "k1")]);
+    expect(groups.map((g) => g.exercises.map((e) => e.id))).toEqual([["a"], ["b"], ["c"]]);
+  });
+
+  it("returns [] for empty input", () => {
+    expect(groupExercisesIntoBlocks([])).toEqual([]);
   });
 });
