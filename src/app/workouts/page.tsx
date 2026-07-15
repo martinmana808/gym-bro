@@ -61,7 +61,13 @@ export default async function WorkoutsPage() {
                 Resume session
               </Link>
             ) : (
-              <form action={startSession.bind(null, w.id)} className="flex-1">
+              <form
+                action={async () => {
+                  "use server";
+                  await startSession(w.id);
+                }}
+                className="flex-1"
+              >
                 <button className="w-full rounded-xl bg-lime-400 py-2.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98]">
                   Start
                 </button>

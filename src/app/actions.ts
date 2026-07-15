@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUserId } from "@/auth";
@@ -139,14 +139,79 @@ async function ownedDay(dayId: string, userId: string) {
   return day;
 }
 
-async function baseVariationId(dayId: string): Promise<string> {
+/** Verify the variation belongs to the user (via its day/program); return it. */
+async function ownedVariation(variationId: string, userId: string) {
   const db = await getDb();
-  const v = await db.query.variations.findFirst({
-    where: eq(schema.variations.dayId, dayId),
-    orderBy: asc(schema.variations.position),
+  const v = await db.query.variations.findFirst({ where: eq(schema.variations.id, variationId) });
+  if (!v) throw new Error("Variation not found");
+  await ownedDay(v.dayId, userId); // throws if not owned
+  return v;
+}
+
+export async function createVariation(dayId: string, sourceVariationId: string) {
+  const userId = await requireUserId();
+  await ownedDay(dayId, userId);
+  const source = await ownedVariation(sourceVariationId, userId);
+  const db = await getDb();
+  const siblings = await db.query.variations.findMany({ where: eq(schema.variations.dayId, dayId) });
+  const sourceExercises = await db.query.exercises.findMany({
+    where: eq(schema.exercises.variationId, sourceVariationId),
+    orderBy: asc(schema.exercises.position),
   });
-  if (!v) throw new Error("Variation missing");
-  return v.id;
+  let newId = "";
+  await db.transaction(async (tx) => {
+    const [v] = await tx
+      .insert(schema.variations)
+      .values({ dayId, position: siblings.length, name: `${source.name} copy`.slice(0, 60) })
+      .returning({ id: schema.variations.id });
+    newId = v.id;
+    if (sourceExercises.length) {
+      await tx.insert(schema.exercises).values(
+        sourceExercises.map((e) => ({
+          variationId: v.id,
+          position: e.position,
+          lineageId: crypto.randomUUID(), // fresh: a copy is a new lineage until user aligns it
+          sectionName: e.sectionName,
+          supersetKey: e.supersetKey,
+          name: e.name,
+          sets: e.sets,
+          measurement: e.measurement,
+          repScheme: e.repScheme,
+          repsMin: e.repsMin,
+          repsMax: e.repsMax,
+          timeSeconds: e.timeSeconds,
+          restOverrideSeconds: e.restOverrideSeconds,
+          note: e.note,
+          weightUnit: e.weightUnit,
+          targetWeight: e.targetWeight,
+        })),
+      );
+    }
+  });
+  revalidatePath(`/workouts/${dayId}`);
+  redirect(`/workouts/${dayId}?v=${newId}`);
+}
+
+export async function renameVariation(variationId: string, name: string) {
+  const userId = await requireUserId();
+  const v = await ownedVariation(variationId, userId);
+  const db = await getDb();
+  await db
+    .update(schema.variations)
+    .set({ name: name.trim().slice(0, 60) || "Variation" })
+    .where(eq(schema.variations.id, variationId));
+  revalidatePath(`/workouts/${v.dayId}`);
+}
+
+export async function deleteVariation(variationId: string) {
+  const userId = await requireUserId();
+  const v = await ownedVariation(variationId, userId);
+  const db = await getDb();
+  const siblings = await db.query.variations.findMany({ where: eq(schema.variations.dayId, v.dayId) });
+  if (siblings.length <= 1) throw new Error("A day needs at least one variation");
+  await db.delete(schema.variations).where(eq(schema.variations.id, variationId));
+  revalidatePath(`/workouts/${v.dayId}`);
+  redirect(`/workouts/${v.dayId}`);
 }
 
 /**
@@ -155,12 +220,12 @@ async function baseVariationId(dayId: string): Promise<string> {
  * are re-keyed each save (grouping is cosmetic; exercise identity is what
  * carries history).
  */
-export async function updateWorkout(dayId: string, input: WorkoutInput) {
+export async function updateVariation(variationId: string, input: WorkoutInput) {
   const userId = await requireUserId();
-  await ownedDay(dayId, userId);
+  const variation = await ownedVariation(variationId, userId);
+  const dayId = variation.dayId;
   const db = await getDb();
   const data = sanitizeWorkout(input);
-  const variationId = await baseVariationId(dayId);
 
   await db
     .update(schema.days)
@@ -212,7 +277,7 @@ export async function updateWorkout(dayId: string, input: WorkoutInput) {
 
   revalidatePath("/workouts");
   revalidatePath(`/workouts/${dayId}`);
-  redirect(`/workouts/${dayId}`);
+  redirect(`/workouts/${dayId}?v=${variationId}`);
 }
 
 export async function deleteWorkout(dayId: string) {
@@ -228,14 +293,31 @@ export async function deleteWorkout(dayId: string) {
   redirect("/workouts");
 }
 
-export async function startSession(dayId: string) {
+export async function startSession(dayId: string, variationId?: string) {
   const userId = await requireUserId();
   await ownedDay(dayId, userId);
   const db = await getDb();
-  const variationId = await baseVariationId(dayId);
+  let vId = variationId;
+  if (vId) {
+    const v = await ownedVariation(vId, userId);
+    if (v.dayId !== dayId) throw new Error("Variation does not belong to this day");
+  } else {
+    // Default: the most recently used variation for this day, else the first.
+    const lastSession = await db.query.sessions.findFirst({
+      where: eq(schema.sessions.dayId, dayId),
+      orderBy: desc(schema.sessions.startedAt),
+    });
+    vId =
+      lastSession?.variationId ??
+      (await db.query.variations.findFirst({
+        where: eq(schema.variations.dayId, dayId),
+        orderBy: asc(schema.variations.position),
+      }))?.id;
+    if (!vId) throw new Error("Day has no variation");
+  }
   const [session] = await db
     .insert(schema.sessions)
-    .values({ dayId, variationId, userId })
+    .values({ dayId, variationId: vId, userId })
     .returning({ id: schema.sessions.id });
   redirect(`/sessions/${session.id}`);
 }

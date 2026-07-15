@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserId } from "@/auth";
-import { getUnfinishedSession, getWorkoutHistory, getWorkoutStructure } from "@/db/queries";
+import {
+  getUnfinishedSession,
+  getVariationStructure,
+  getWorkoutHistory,
+  listDayVariations,
+} from "@/db/queries";
 import { deleteWorkout, startSession } from "@/app/actions";
 import {
   blockLabel,
@@ -12,21 +17,31 @@ import {
   formatTarget,
 } from "@/lib/workout";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { VariationsBar } from "@/components/VariationsBar";
 
 export const dynamic = "force-dynamic";
 
 export default async function WorkoutDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ v?: string }>;
 }) {
   const { id } = await params;
+  const { v } = await searchParams;
   const userId = await requireUserId();
-  const [structure, history, unfinished] = await Promise.all([
-    getWorkoutStructure(id, userId),
+  const [variations, history, unfinished] = await Promise.all([
+    listDayVariations(id, userId),
     getWorkoutHistory(id),
     getUnfinishedSession(id, userId),
   ]);
+  const activeId =
+    (v && variations.some((va) => va.id === v) ? v : undefined) ??
+    history.sessions[0]?.variationId ??
+    variations[0]?.id;
+  if (!activeId) notFound();
+  const structure = await getVariationStructure(activeId, userId);
   if (!structure) notFound();
   const { workout, blocks } = structure;
   // Oldest → newest, like the week columns of the spreadsheet.
@@ -72,12 +87,20 @@ export default async function WorkoutDetailPage({
           </p>
         </div>
         <Link
-          href={`/workouts/${workout.id}/edit`}
+          href={`/workouts/${workout.id}/edit?v=${activeId}`}
           className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-500"
         >
           Edit
         </Link>
       </header>
+
+      {variations.length > 0 && (
+        <VariationsBar
+          dayId={id}
+          variations={variations.map((va) => ({ id: va.id, name: va.name }))}
+          activeId={activeId}
+        />
+      )}
 
       {unfinished ? (
         <Link
@@ -87,7 +110,7 @@ export default async function WorkoutDetailPage({
           Resume session in progress
         </Link>
       ) : (
-        <form action={startSession.bind(null, workout.id)}>
+        <form action={startSession.bind(null, workout.id, activeId)}>
           <button className="w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98]">
             Start workout
           </button>
@@ -161,6 +184,11 @@ export default async function WorkoutDetailPage({
                           <span className="block text-[11px] font-normal tabular-nums text-zinc-500">
                             {durationSeconds > 0 ? formatClock(durationSeconds) : "—"}
                           </span>
+                          {history.variationNameBySession[s.id] && (
+                            <span className="block text-[11px] font-normal text-zinc-600">
+                              {history.variationNameBySession[s.id]}
+                            </span>
+                          )}
                         </Link>
                       </th>
                     );

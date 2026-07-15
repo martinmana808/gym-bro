@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import {
   createWorkout,
-  updateWorkout,
+  updateVariation,
   type BlockInput,
   type ExerciseInput,
   type WorkoutInput,
@@ -35,10 +35,10 @@ const field =
   "placeholder:text-zinc-600 transition focus:border-lime-400 focus:outline-none";
 
 export function WorkoutBuilder({
-  workoutId,
+  variationId,
   initial,
 }: {
-  workoutId?: string;
+  variationId?: string;
   initial?: { name: string; defaultRestSeconds: number; blocks: BlockInput[] };
 }) {
   const [name, setName] = useState(initial?.name ?? "");
@@ -90,7 +90,7 @@ export function WorkoutBuilder({
     setError(null);
     startTransition(async () => {
       try {
-        if (workoutId) await updateWorkout(workoutId, payload);
+        if (variationId) await updateVariation(variationId, payload);
         else await createWorkout(payload);
       } catch (e) {
         if (e && typeof e === "object" && "digest" in e) throw e; // Next redirect
@@ -388,7 +388,7 @@ export function WorkoutBuilder({
           onClick={save}
           className="mx-auto block w-full max-w-md rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
         >
-          {pending ? "Saving…" : workoutId ? "Save changes" : "Create workout"}
+          {pending ? "Saving…" : variationId ? "Save changes" : "Create workout"}
         </button>
       </div>
     </div>
