@@ -161,6 +161,8 @@ function SetEditor({
               weight: weight === "" ? null : Number(weight),
               reps: isTime || reps === "" ? null : Number(reps),
               timeSeconds: isTime && seconds !== "" ? Number(seconds) : null,
+              // Preserve a set's "OK" status across an unrelated edit (e.g. fixing the weight).
+              hitTarget: entry?.hitTarget ?? false,
             })
           }
           className="mt-4 w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98]"
