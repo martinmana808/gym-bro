@@ -1,38 +1,55 @@
-import { and, desc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Block, Exercise, Session, SessionNote, SetLog, Workout } from "@/db/schema";
+import { groupExercisesIntoBlocks } from "@/lib/workout";
 
 export type WorkoutStructure = {
   workout: Workout;
   blocks: (Block & { exercises: Exercise[] })[];
 };
 
+/** The single "Base" variation of a day (Stage 1 has exactly one per day). */
+async function dayView(dayId: string, userId: string) {
+  const db = await getDb();
+  const day = await db.query.days.findFirst({ where: eq(schema.days.id, dayId) });
+  if (!day) return null;
+  const program = await db.query.programs.findFirst({
+    where: and(eq(schema.programs.id, day.programId), eq(schema.programs.userId, userId)),
+  });
+  if (!program) return null;
+  const variation = await db.query.variations.findFirst({
+    where: eq(schema.variations.dayId, dayId),
+    orderBy: asc(schema.variations.position),
+  });
+  const workout: Workout = {
+    id: day.id,
+    userId: program.userId,
+    name: day.name,
+    defaultRestSeconds: day.defaultRestSeconds,
+    createdAt: program.createdAt,
+  };
+  return { day, program, variation, workout };
+}
+
 export async function getWorkoutStructure(
-  workoutId: string,
+  dayId: string,
   userId: string,
 ): Promise<WorkoutStructure | null> {
   const db = await getDb();
-  const workout = await db.query.workouts.findFirst({
-    where: and(eq(schema.workouts.id, workoutId), eq(schema.workouts.userId, userId)),
-  });
-  if (!workout) return null;
-  const blocks = await db.query.blocks.findMany({
-    where: eq(schema.blocks.workoutId, workoutId),
-    orderBy: schema.blocks.position,
-  });
-  const exercises = blocks.length
+  const view = await dayView(dayId, userId);
+  if (!view) return null;
+  const exercises = view.variation
     ? await db.query.exercises.findMany({
-        where: inArray(schema.exercises.blockId, blocks.map((b) => b.id)),
-        orderBy: schema.exercises.position,
+        where: eq(schema.exercises.variationId, view.variation.id),
+        orderBy: asc(schema.exercises.position),
       })
     : [];
-  return {
-    workout,
-    blocks: blocks.map((b) => ({
-      ...b,
-      exercises: exercises.filter((e) => e.blockId === b.id),
-    })),
-  };
+  const blocks = groupExercisesIntoBlocks(exercises).map((g, i) => ({
+    id: g.key,
+    position: i,
+    exercises: g.exercises,
+  }));
+  return { workout: view.workout, blocks };
 }
 
 export type WorkoutListItem = Workout & {
@@ -43,30 +60,52 @@ export type WorkoutListItem = Workout & {
 
 export async function listWorkouts(userId: string): Promise<WorkoutListItem[]> {
   const db = await getDb();
-  const workouts = await db.query.workouts.findMany({
-    where: eq(schema.workouts.userId, userId),
-    orderBy: schema.workouts.createdAt,
+  const programs = await db.query.programs.findMany({
+    where: eq(schema.programs.userId, userId),
+    orderBy: asc(schema.programs.createdAt),
   });
-  if (!workouts.length) return [];
-  const ids = workouts.map((w) => w.id);
-  const blocks = await db.query.blocks.findMany({
-    where: inArray(schema.blocks.workoutId, ids),
+  if (!programs.length) return [];
+  const programById = new Map(programs.map((p) => [p.id, p]));
+  const days = await db.query.days.findMany({
+    where: inArray(schema.days.programId, programs.map((p) => p.id)),
+    orderBy: asc(schema.days.position),
   });
-  const exercises = blocks.length
+  if (!days.length) return [];
+  const dayIds = days.map((d) => d.id);
+  const variations = await db.query.variations.findMany({
+    where: inArray(schema.variations.dayId, dayIds),
+    orderBy: asc(schema.variations.position),
+  });
+  // First variation per day = its Base.
+  const baseVarByDay = new Map<string, string>();
+  for (const v of variations) if (!baseVarByDay.has(v.dayId)) baseVarByDay.set(v.dayId, v.id);
+  const baseVarIds = [...baseVarByDay.values()];
+  const exercises = baseVarIds.length
     ? await db.query.exercises.findMany({
-        where: inArray(schema.exercises.blockId, blocks.map((b) => b.id)),
+        where: inArray(schema.exercises.variationId, baseVarIds),
       })
     : [];
   const sessions = await db.query.sessions.findMany({
-    where: inArray(schema.sessions.workoutId, ids),
+    where: inArray(schema.sessions.dayId, dayIds),
     orderBy: desc(schema.sessions.startedAt),
   });
-  return workouts.map((w) => {
-    const blockIds = new Set(blocks.filter((b) => b.workoutId === w.id).map((b) => b.id));
-    const mine = sessions.filter((s) => s.workoutId === w.id);
+  // Preserve the old ordering: by program.createdAt, then day.position.
+  const ordered = [...days].sort((a, b) => {
+    const pa = programById.get(a.programId)!.createdAt.getTime();
+    const pb = programById.get(b.programId)!.createdAt.getTime();
+    return pa - pb || a.position - b.position;
+  });
+  return ordered.map((d) => {
+    const program = programById.get(d.programId)!;
+    const baseVarId = baseVarByDay.get(d.id);
+    const mine = sessions.filter((s) => s.dayId === d.id);
     return {
-      ...w,
-      exerciseCount: exercises.filter((e) => blockIds.has(e.blockId)).length,
+      id: d.id,
+      userId: program.userId,
+      name: d.name,
+      defaultRestSeconds: d.defaultRestSeconds,
+      createdAt: program.createdAt,
+      exerciseCount: exercises.filter((e) => e.variationId === baseVarId).length,
       lastFinishedAt: mine.find((s) => s.finishedAt)?.finishedAt ?? null,
       unfinishedSessionId: mine.find((s) => !s.finishedAt)?.id ?? null,
     };
@@ -79,20 +118,17 @@ export type WorkoutHistory = {
   notesBySession: Record<string, SessionNote[]>;
 };
 
-export async function getWorkoutHistory(
-  workoutId: string,
-  limit = 6,
-): Promise<WorkoutHistory> {
+export async function getWorkoutHistory(dayId: string, limit = 6): Promise<WorkoutHistory> {
   const db = await getDb();
   const sessions = await db.query.sessions.findMany({
-    where: eq(schema.sessions.workoutId, workoutId),
+    where: eq(schema.sessions.dayId, dayId),
     orderBy: desc(schema.sessions.startedAt),
   });
   const finished = sessions.filter((s) => s.finishedAt).slice(0, limit);
   const logs = finished.length
     ? await db.query.setLogs.findMany({
         where: inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
-        orderBy: schema.setLogs.setNumber,
+        orderBy: asc(schema.setLogs.setNumber),
       })
     : [];
   const logsBySession: Record<string, SetLog[]> = {};
@@ -107,11 +143,13 @@ export async function getWorkoutHistory(
   return { sessions: finished, logsBySession, notesBySession };
 }
 
-export async function getUnfinishedSession(workoutId: string, userId: string) {
+export async function getUnfinishedSession(dayId: string, userId: string) {
   const db = await getDb();
+  const view = await dayView(dayId, userId);
+  if (!view) return undefined;
   return db.query.sessions.findFirst({
     where: and(
-      eq(schema.sessions.workoutId, workoutId),
+      eq(schema.sessions.dayId, dayId),
       eq(schema.sessions.userId, userId),
       isNull(schema.sessions.finishedAt),
     ),
@@ -122,8 +160,8 @@ export async function getUnfinishedSession(workoutId: string, userId: string) {
 export type SessionData = {
   session: Session;
   structure: WorkoutStructure;
-  logs: SetLog[]; // this session
-  previousLogs: SetLog[]; // most recent finished session before this one
+  logs: SetLog[];
+  previousLogs: SetLog[];
   notes: SessionNote[];
 };
 
@@ -136,13 +174,13 @@ export async function getSessionData(
     where: and(eq(schema.sessions.id, sessionId), eq(schema.sessions.userId, userId)),
   });
   if (!session) return null;
-  const structure = await getWorkoutStructure(session.workoutId, userId);
+  const structure = await getWorkoutStructure(session.dayId, userId);
   if (!structure) return null;
   const logs = await db.query.setLogs.findMany({
     where: eq(schema.setLogs.sessionId, sessionId),
   });
   const previous = await db.query.sessions.findMany({
-    where: and(eq(schema.sessions.workoutId, session.workoutId), eq(schema.sessions.userId, userId)),
+    where: and(eq(schema.sessions.dayId, session.dayId), eq(schema.sessions.userId, userId)),
     orderBy: desc(schema.sessions.startedAt),
   });
   const prev = previous.find((s) => s.finishedAt && s.startedAt < session.startedAt);

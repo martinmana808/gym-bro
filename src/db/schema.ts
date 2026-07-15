@@ -1,4 +1,5 @@
 import {
+  boolean,
   integer,
   pgTable,
   real,
@@ -17,24 +18,33 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const workouts = pgTable("workouts", {
+export const programs = pgTable("programs", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
-  defaultRestSeconds: integer("default_rest_seconds").notNull().default(90),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-// A block groups 1-3 exercises performed back-to-back without rest:
-// 1 = plain exercise, 2 = superset, 3 = triset.
-export const blocks = pgTable("blocks", {
+export const days = pgTable("days", {
   id: uuid("id").primaryKey().defaultRandom(),
-  workoutId: uuid("workout_id")
+  programId: uuid("program_id")
     .notNull()
-    .references(() => workouts.id, { onDelete: "cascade" }),
+    .references(() => programs.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
+  name: text("name").notNull(),
+  defaultRestSeconds: integer("default_rest_seconds").notNull().default(90),
+});
+
+export const variations = pgTable("variations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  dayId: uuid("day_id")
+    .notNull()
+    .references(() => days.id, { onDelete: "cascade" }),
+  position: integer("position").notNull(),
+  name: text("name").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
 export type Measurement = "reps" | "time";
@@ -42,10 +52,13 @@ export type RepScheme = "fixed" | "range" | "failure";
 
 export const exercises = pgTable("exercises", {
   id: uuid("id").primaryKey().defaultRandom(),
-  blockId: uuid("block_id")
+  variationId: uuid("variation_id")
     .notNull()
-    .references(() => blocks.id, { onDelete: "cascade" }),
+    .references(() => variations.id, { onDelete: "cascade" }),
   position: integer("position").notNull(),
+  lineageId: uuid("lineage_id").notNull(),
+  sectionName: text("section_name"),
+  supersetKey: text("superset_key"),
   name: text("name").notNull(),
   sets: integer("sets").notNull(),
   measurement: text("measurement").$type<Measurement>().notNull(),
@@ -56,13 +69,17 @@ export const exercises = pgTable("exercises", {
   restOverrideSeconds: integer("rest_override_seconds"),
   note: text("note"),
   weightUnit: text("weight_unit").$type<WeightUnit>().notNull().default("kg"),
+  targetWeight: real("target_weight"),
 });
 
 export const sessions = pgTable("sessions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  workoutId: uuid("workout_id")
+  dayId: uuid("day_id")
     .notNull()
-    .references(() => workouts.id, { onDelete: "cascade" }),
+    .references(() => days.id, { onDelete: "cascade" }),
+  variationId: uuid("variation_id")
+    .notNull()
+    .references(() => variations.id, { onDelete: "cascade" }),
   userId: uuid("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -85,6 +102,7 @@ export const setLogs = pgTable(
     weight: real("weight_kg"),
     reps: integer("reps"),
     timeSeconds: integer("time_seconds"),
+    hitTarget: boolean("hit_target").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("set_logs_unique_set").on(t.sessionId, t.exerciseId, t.setNumber)],
@@ -106,9 +124,22 @@ export const sessionNotes = pgTable(
   (t) => [uniqueIndex("session_notes_unique").on(t.sessionId, t.exerciseId)],
 );
 
-export type Workout = typeof workouts.$inferSelect;
-export type Block = typeof blocks.$inferSelect;
+export type Program = typeof programs.$inferSelect;
+export type Day = typeof days.$inferSelect;
+export type Variation = typeof variations.$inferSelect;
 export type Exercise = typeof exercises.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type SetLog = typeof setLogs.$inferSelect;
 export type SessionNote = typeof sessionNotes.$inferSelect;
+
+// Compat shapes the query layer synthesizes so the existing UI is unchanged.
+// A "workout" in the UI is a Day + its Base variation; a "block" is a run of
+// exercises sharing a superset_key.
+export type Workout = {
+  id: string; // = day.id
+  userId: string;
+  name: string;
+  defaultRestSeconds: number;
+  createdAt: Date;
+};
+export type Block = { id: string; position: number };

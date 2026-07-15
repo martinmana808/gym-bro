@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUserId } from "@/auth";
@@ -71,30 +71,19 @@ function sanitizeWorkout(input: WorkoutInput): WorkoutInput {
   };
 }
 
-export async function createWorkout(input: WorkoutInput) {
-  const userId = await requireUserId();
-  const db = await getDb();
-  const data = sanitizeWorkout(input);
-  const [workout] = await db
-    .insert(schema.workouts)
-    .values({ userId, name: data.name, defaultRestSeconds: data.defaultRestSeconds })
-    .returning({ id: schema.workouts.id });
-  await insertBlocks(workout.id, data.blocks);
-  revalidatePath("/workouts");
-  redirect(`/workouts/${workout.id}`);
-}
-
-async function insertBlocks(workoutId: string, blocks: BlockInput[], startPos = 0) {
-  const db = await getDb();
-  for (const [i, block] of blocks.entries()) {
-    const [row] = await db
-      .insert(schema.blocks)
-      .values({ workoutId, position: startPos + i })
-      .returning({ id: schema.blocks.id });
-    await db.insert(schema.exercises).values(
-      block.exercises.map((e, j) => ({
-        blockId: row.id,
-        position: j,
+/** Flatten builder blocks into exercise rows for one variation: one shared
+ * superset_key per block, day-global position, fresh lineage. */
+function flattenBlockExercises(blocks: BlockInput[], variationId: string) {
+  const rows: (typeof schema.exercises.$inferInsert)[] = [];
+  blocks.forEach((block, i) => {
+    const supersetKey = crypto.randomUUID();
+    block.exercises.forEach((e, j) => {
+      rows.push({
+        variationId,
+        position: i * 1000 + j,
+        lineageId: crypto.randomUUID(),
+        sectionName: null,
+        supersetKey,
         name: e.name,
         sets: e.sets,
         measurement: e.measurement,
@@ -105,78 +94,98 @@ async function insertBlocks(workoutId: string, blocks: BlockInput[], startPos = 
         restOverrideSeconds: e.restOverrideSeconds,
         note: e.note,
         weightUnit: e.weightUnit,
-      })),
-    );
-  }
+        targetWeight: null,
+      });
+    });
+  });
+  return rows;
 }
 
-async function ownedWorkout(workoutId: string, userId: string) {
+export async function createWorkout(input: WorkoutInput) {
+  const userId = await requireUserId();
   const db = await getDb();
-  const workout = await db.query.workouts.findFirst({
-    where: and(eq(schema.workouts.id, workoutId), eq(schema.workouts.userId, userId)),
+  const data = sanitizeWorkout(input);
+  let dayId = "";
+  await db.transaction(async (tx) => {
+    const [program] = await tx
+      .insert(schema.programs)
+      .values({ userId, name: data.name })
+      .returning({ id: schema.programs.id });
+    const [day] = await tx
+      .insert(schema.days)
+      .values({ programId: program.id, position: 0, name: data.name, defaultRestSeconds: data.defaultRestSeconds })
+      .returning({ id: schema.days.id });
+    const [variation] = await tx
+      .insert(schema.variations)
+      .values({ dayId: day.id, position: 0, name: "Base" })
+      .returning({ id: schema.variations.id });
+    const rows = flattenBlockExercises(data.blocks, variation.id);
+    if (rows.length) await tx.insert(schema.exercises).values(rows);
+    dayId = day.id;
   });
-  if (!workout) throw new Error("Workout not found");
-  return workout;
+  revalidatePath("/workouts");
+  redirect(`/workouts/${dayId}`);
+}
+
+/** Verify the day belongs to the user; return it (with programId). */
+async function ownedDay(dayId: string, userId: string) {
+  const db = await getDb();
+  const day = await db.query.days.findFirst({ where: eq(schema.days.id, dayId) });
+  if (!day) throw new Error("Workout not found");
+  const program = await db.query.programs.findFirst({
+    where: and(eq(schema.programs.id, day.programId), eq(schema.programs.userId, userId)),
+  });
+  if (!program) throw new Error("Workout not found");
+  return day;
+}
+
+async function baseVariationId(dayId: string): Promise<string> {
+  const db = await getDb();
+  const v = await db.query.variations.findFirst({
+    where: eq(schema.variations.dayId, dayId),
+    orderBy: asc(schema.variations.position),
+  });
+  if (!v) throw new Error("Variation missing");
+  return v.id;
 }
 
 /**
- * Update-in-place: blocks/exercises whose ids are echoed back are updated
- * (preserving their set-log history), missing ones are deleted, new ones inserted.
+ * Update-in-place: exercises whose ids are echoed back are updated (preserving
+ * their set-log history), missing ones are deleted, new ones inserted. Blocks
+ * are re-keyed each save (grouping is cosmetic; exercise identity is what
+ * carries history).
  */
-export async function updateWorkout(workoutId: string, input: WorkoutInput) {
+export async function updateWorkout(dayId: string, input: WorkoutInput) {
   const userId = await requireUserId();
-  await ownedWorkout(workoutId, userId);
+  await ownedDay(dayId, userId);
   const db = await getDb();
   const data = sanitizeWorkout(input);
+  const variationId = await baseVariationId(dayId);
 
   await db
-    .update(schema.workouts)
+    .update(schema.days)
     .set({ name: data.name, defaultRestSeconds: data.defaultRestSeconds })
-    .where(eq(schema.workouts.id, workoutId));
+    .where(eq(schema.days.id, dayId));
 
-  const existingBlocks = await db.query.blocks.findMany({
-    where: eq(schema.blocks.workoutId, workoutId),
+  const existing = await db.query.exercises.findMany({
+    where: eq(schema.exercises.variationId, variationId),
   });
-  const existingBlockIds = new Set(existingBlocks.map((b) => b.id));
-  const existingExercises = existingBlocks.length
-    ? await db.query.exercises.findMany({
-        where: inArray(schema.exercises.blockId, [...existingBlockIds]),
-      })
-    : [];
-  const existingExerciseIds = new Set(existingExercises.map((e) => e.id));
-
-  const keptBlockIds = new Set(
-    data.blocks.map((b) => b.id).filter((id): id is string => !!id && existingBlockIds.has(id)),
-  );
-  const keptExerciseIds = new Set(
+  const existingIds = new Set(existing.map((e) => e.id));
+  const keptIds = new Set(
     data.blocks
       .flatMap((b) => b.exercises.map((e) => e.id))
-      .filter((id): id is string => !!id && existingExerciseIds.has(id)),
+      .filter((id): id is string => !!id && existingIds.has(id)),
   );
-
-  const dropBlocks = [...existingBlockIds].filter((id) => !keptBlockIds.has(id));
-  if (dropBlocks.length) await db.delete(schema.blocks).where(inArray(schema.blocks.id, dropBlocks));
-  const dropExercises = existingExercises
-    .filter((e) => keptBlockIds.has(e.blockId) && !keptExerciseIds.has(e.id))
-    .map((e) => e.id);
-  if (dropExercises.length)
-    await db.delete(schema.exercises).where(inArray(schema.exercises.id, dropExercises));
+  const dropIds = [...existingIds].filter((id) => !keptIds.has(id));
+  if (dropIds.length) await db.delete(schema.exercises).where(inArray(schema.exercises.id, dropIds));
 
   for (const [i, block] of data.blocks.entries()) {
-    let blockId = block.id && keptBlockIds.has(block.id) ? block.id : null;
-    if (blockId) {
-      await db.update(schema.blocks).set({ position: i }).where(eq(schema.blocks.id, blockId));
-    } else {
-      const [row] = await db
-        .insert(schema.blocks)
-        .values({ workoutId, position: i })
-        .returning({ id: schema.blocks.id });
-      blockId = row.id;
-    }
+    const supersetKey = crypto.randomUUID();
     for (const [j, e] of block.exercises.entries()) {
-      const values = {
-        blockId,
-        position: j,
+      const common = {
+        position: i * 1000 + j,
+        sectionName: null,
+        supersetKey,
         name: e.name,
         sets: e.sets,
         measurement: e.measurement,
@@ -188,35 +197,45 @@ export async function updateWorkout(workoutId: string, input: WorkoutInput) {
         note: e.note,
         weightUnit: e.weightUnit,
       };
-      if (e.id && keptExerciseIds.has(e.id)) {
-        await db.update(schema.exercises).set(values).where(eq(schema.exercises.id, e.id));
+      if (e.id && keptIds.has(e.id)) {
+        await db.update(schema.exercises).set(common).where(eq(schema.exercises.id, e.id));
       } else {
-        await db.insert(schema.exercises).values(values);
+        await db.insert(schema.exercises).values({
+          ...common,
+          variationId,
+          lineageId: crypto.randomUUID(),
+          targetWeight: null,
+        });
       }
     }
   }
 
   revalidatePath("/workouts");
-  revalidatePath(`/workouts/${workoutId}`);
-  redirect(`/workouts/${workoutId}`);
+  revalidatePath(`/workouts/${dayId}`);
+  redirect(`/workouts/${dayId}`);
 }
 
-export async function deleteWorkout(workoutId: string) {
+export async function deleteWorkout(dayId: string) {
   const userId = await requireUserId();
-  await ownedWorkout(workoutId, userId);
+  const day = await ownedDay(dayId, userId);
   const db = await getDb();
-  await db.delete(schema.workouts).where(eq(schema.workouts.id, workoutId));
+  await db.delete(schema.days).where(eq(schema.days.id, dayId));
+  const remaining = await db.query.days.findFirst({
+    where: eq(schema.days.programId, day.programId),
+  });
+  if (!remaining) await db.delete(schema.programs).where(eq(schema.programs.id, day.programId));
   revalidatePath("/workouts");
   redirect("/workouts");
 }
 
-export async function startSession(workoutId: string) {
+export async function startSession(dayId: string) {
   const userId = await requireUserId();
-  await ownedWorkout(workoutId, userId);
+  await ownedDay(dayId, userId);
   const db = await getDb();
+  const variationId = await baseVariationId(dayId);
   const [session] = await db
     .insert(schema.sessions)
-    .values({ workoutId, userId })
+    .values({ dayId, variationId, userId })
     .returning({ id: schema.sessions.id });
   redirect(`/sessions/${session.id}`);
 }
@@ -299,7 +318,7 @@ export async function finishSession(sessionId: string) {
       .set({ finishedAt: new Date() })
       .where(eq(schema.sessions.id, sessionId));
   }
-  revalidatePath(`/workouts/${session.workoutId}`);
+  revalidatePath(`/workouts/${session.dayId}`);
   revalidatePath("/workouts");
 }
 
@@ -308,8 +327,8 @@ export async function deleteSession(sessionId: string) {
   const session = await ownedSession(sessionId, userId);
   const db = await getDb();
   await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
-  revalidatePath(`/workouts/${session.workoutId}`);
-  redirect(`/workouts/${session.workoutId}`);
+  revalidatePath(`/workouts/${session.dayId}`);
+  redirect(`/workouts/${session.dayId}`);
 }
 
 export type ImportSetPayload = { setNumber: number; weight: number | null; reps: number | null };
@@ -332,14 +351,19 @@ export async function importSpreadsheet(days: ImportDayPayload[]) {
 
   await db.transaction(async (tx) => {
     for (const dayPayload of days) {
-      const [workout] = await tx
-        .insert(schema.workouts)
-        .values({
-          userId,
-          name: dayPayload.name.trim().slice(0, 80) || "Imported workout",
-          defaultRestSeconds: 90,
-        })
-        .returning({ id: schema.workouts.id });
+      const name = dayPayload.name.trim().slice(0, 80) || "Imported workout";
+      const [program] = await tx
+        .insert(schema.programs)
+        .values({ userId, name })
+        .returning({ id: schema.programs.id });
+      const [day] = await tx
+        .insert(schema.days)
+        .values({ programId: program.id, position: 0, name, defaultRestSeconds: 90 })
+        .returning({ id: schema.days.id });
+      const [variation] = await tx
+        .insert(schema.variations)
+        .values({ dayId: day.id, position: 0, name: "Base" })
+        .returning({ id: schema.variations.id });
 
       const sessionIds: string[] = [];
       for (const iso of dayPayload.dates) {
@@ -347,13 +371,12 @@ export async function importSpreadsheet(days: ImportDayPayload[]) {
         if (Number.isNaN(startedAt.getTime())) throw new Error("Invalid date in import");
         const [s] = await tx
           .insert(schema.sessions)
-          // finishedAt = startedAt: imported sessions are finished; duration unknown → renders "—".
-          .values({ workoutId: workout.id, userId, startedAt, finishedAt: startedAt })
+          .values({ dayId: day.id, variationId: variation.id, userId, startedAt, finishedAt: startedAt })
           .returning({ id: schema.sessions.id });
         sessionIds.push(s.id);
       }
 
-      // Group merged-Sets rows into blocks; blocks hold at most 3 exercises.
+      // Group merged-Sets rows into supersets; blocks hold at most 3 exercises.
       const groups: ImportExercisePayload[][] = [];
       for (const e of dayPayload.exercises) {
         const last = groups.at(-1);
@@ -361,18 +384,18 @@ export async function importSpreadsheet(days: ImportDayPayload[]) {
         else last.push(e);
       }
 
-      for (const [position, group] of groups.entries()) {
-        const [block] = await tx
-          .insert(schema.blocks)
-          .values({ workoutId: workout.id, position })
-          .returning({ id: schema.blocks.id });
+      for (const [gi, group] of groups.entries()) {
+        const supersetKey = crypto.randomUUID();
         for (const [j, e] of group.entries()) {
           const sets = Math.min(20, Math.max(1, Math.round(e.sets) || 1));
           const [exercise] = await tx
             .insert(schema.exercises)
             .values({
-              blockId: block.id,
-              position: j,
+              variationId: variation.id,
+              position: gi * 1000 + j,
+              lineageId: crypto.randomUUID(),
+              sectionName: null,
+              supersetKey,
               name: e.name.trim().slice(0, 120),
               sets,
               measurement: "reps",
@@ -386,6 +409,7 @@ export async function importSpreadsheet(days: ImportDayPayload[]) {
               restOverrideSeconds: null,
               note: e.note?.trim().slice(0, 500) || null,
               weightUnit: e.weightUnit === "bricks" ? "bricks" : "kg",
+              targetWeight: null,
             })
             .returning({ id: schema.exercises.id });
 

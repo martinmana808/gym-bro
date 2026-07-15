@@ -15,6 +15,13 @@
       "when": 1783573837993,
       "tag": "0001_damp_bloodstorm",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784131205555,
+      "tag": "0002_stage1_programs",
+      "breakpoints": true
     }
   ]
 }

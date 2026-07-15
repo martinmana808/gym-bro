@@ -15,21 +15,25 @@ export async function GET() {
   if (!userId) return new Response("Unauthorized", { status: 401 });
 
   const db = await getDb();
-  const workouts = await db.query.workouts.findMany({
-    where: eq(schema.workouts.userId, userId),
+  const programs = await db.query.programs.findMany({
+    where: eq(schema.programs.userId, userId),
   });
-  const workoutIds = workouts.map((w) => w.id);
-  const blocks = workoutIds.length
-    ? await db.query.blocks.findMany({ where: inArray(schema.blocks.workoutId, workoutIds) })
+  const programIds = programs.map((p) => p.id);
+  const days = programIds.length
+    ? await db.query.days.findMany({ where: inArray(schema.days.programId, programIds) })
     : [];
-  const exercises = blocks.length
+  const dayIds = days.map((d) => d.id);
+  const variations = dayIds.length
+    ? await db.query.variations.findMany({ where: inArray(schema.variations.dayId, dayIds) })
+    : [];
+  const exercises = variations.length
     ? await db.query.exercises.findMany({
-        where: inArray(schema.exercises.blockId, blocks.map((b) => b.id)),
+        where: inArray(schema.exercises.variationId, variations.map((v) => v.id)),
       })
     : [];
-  const sessions = workoutIds.length
+  const sessions = dayIds.length
     ? await db.query.sessions.findMany({
-        where: inArray(schema.sessions.workoutId, workoutIds),
+        where: inArray(schema.sessions.dayId, dayIds),
         orderBy: schema.sessions.startedAt,
       })
     : [];
@@ -46,8 +50,8 @@ export async function GET() {
       })
     : [];
 
-  const workoutById = new Map(workouts.map((w) => [w.id, w]));
-  const blockById = new Map(blocks.map((b) => [b.id, b]));
+  const dayById = new Map(days.map((d) => [d.id, d]));
+  const variationById = new Map(variations.map((v) => [v.id, v]));
   const exerciseById = new Map(exercises.map((e) => [e.id, e]));
   const sessionById = new Map(sessions.map((s) => [s.id, s]));
   const noteByKey = new Map(notes.map((n) => [`${n.sessionId}#${n.exerciseId}`, n.note]));
@@ -57,7 +61,7 @@ export async function GET() {
     const exercise = exerciseById.get(l.exerciseId);
     const s = sessionById.get(l.sessionId);
     const workout = exercise
-      ? workoutById.get(blockById.get(exercise.blockId)?.workoutId ?? "")
+      ? dayById.get(variationById.get(exercise.variationId)?.dayId ?? "")
       : undefined;
     return [
       workout?.name ?? "",
