@@ -1,0 +1,13 @@
+Day: Push
+Section: Chest
+Bench press,4,kg,fixed,8,60,,
+Incline dumbbell,4,kg,range,8-12,22.5,,
+Section: Triceps
+Pushdown,3,bricks,fixed,12,20,supA,
+Overhead extension,3,kg,fixed,12,15,supA,keep elbows tucked
+Day: Pull
+Section: Back
+Pull-up,3,bricks,failure,,,,
+Barbell row,4,kg,range,6-10,60,,
+Section: Biceps
+Barbell curl,3,kg,fixed,10,30,,

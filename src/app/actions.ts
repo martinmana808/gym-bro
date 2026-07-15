@@ -428,115 +428,70 @@ export async function deleteSession(sessionId: string) {
   redirect(`/workouts/${session.dayId}`);
 }
 
-export type ImportSetPayload = { setNumber: number; weight: number | null; reps: number | null };
-export type ImportCellPayload = { sets: ImportSetPayload[]; note: string | null } | null;
-export type ImportExercisePayload = {
+export type ImportProgramExercise = {
   name: string;
   sets: number;
   weightUnit: WeightUnit;
   repScheme: RepScheme;
   repsMin: number | null;
+  repsMax: number | null;
+  targetWeight: number | null;
+  supersetGroup: string | null;
+  sectionName: string | null;
   note: string | null;
-  blockStart: boolean;
-  cells: ImportCellPayload[];
 };
-export type ImportDayPayload = { name: string; dates: string[]; exercises: ImportExercisePayload[] };
+export type ImportProgramDay = { name: string; exercises: ImportProgramExercise[] };
 
-export async function importSpreadsheet(days: ImportDayPayload[]) {
+export async function importProgram(programName: string, days: ImportProgramDay[]) {
   const userId = await requireUserId();
   const db = await getDb();
-
+  let firstDayId = "";
   await db.transaction(async (tx) => {
-    for (const dayPayload of days) {
-      const name = dayPayload.name.trim().slice(0, 80) || "Imported workout";
-      const [program] = await tx
-        .insert(schema.programs)
-        .values({ userId, name })
-        .returning({ id: schema.programs.id });
+    const [program] = await tx
+      .insert(schema.programs)
+      .values({ userId, name: programName.trim().slice(0, 80) || "Imported program" })
+      .returning({ id: schema.programs.id });
+    for (const [di, d] of days.entries()) {
       const [day] = await tx
         .insert(schema.days)
-        .values({ programId: program.id, position: 0, name, defaultRestSeconds: 90 })
+        .values({ programId: program.id, position: di, name: d.name.trim().slice(0, 80) || `Day ${di + 1}`, defaultRestSeconds: 90 })
         .returning({ id: schema.days.id });
+      if (di === 0) firstDayId = day.id;
       const [variation] = await tx
         .insert(schema.variations)
         .values({ dayId: day.id, position: 0, name: "Base" })
         .returning({ id: schema.variations.id });
-
-      const sessionIds: string[] = [];
-      for (const iso of dayPayload.dates) {
-        const startedAt = new Date(iso);
-        if (Number.isNaN(startedAt.getTime())) throw new Error("Invalid date in import");
-        const [s] = await tx
-          .insert(schema.sessions)
-          .values({ dayId: day.id, variationId: variation.id, userId, startedAt, finishedAt: startedAt })
-          .returning({ id: schema.sessions.id });
-        sessionIds.push(s.id);
-      }
-
-      // Group merged-Sets rows into supersets; blocks hold at most 3 exercises.
-      const groups: ImportExercisePayload[][] = [];
-      for (const e of dayPayload.exercises) {
-        const last = groups.at(-1);
-        if (e.blockStart || !last || last.length >= 3) groups.push([e]);
-        else last.push(e);
-      }
-
-      for (const [gi, group] of groups.entries()) {
-        const supersetKey = crypto.randomUUID();
-        for (const [j, e] of group.entries()) {
+      let prevGroup: string | null = null;
+      let key = crypto.randomUUID();
+      const rows = d.exercises
+        .filter((e) => e.name.trim())
+        .map((e, i) => {
+          const sameBlock = i > 0 && e.supersetGroup != null && e.supersetGroup === prevGroup;
+          if (!sameBlock) key = crypto.randomUUID();
+          prevGroup = e.supersetGroup;
           const sets = Math.min(20, Math.max(1, Math.round(e.sets) || 1));
-          const [exercise] = await tx
-            .insert(schema.exercises)
-            .values({
-              variationId: variation.id,
-              position: gi * 1000 + j,
-              lineageId: crypto.randomUUID(),
-              sectionName: null,
-              supersetKey,
-              name: e.name.trim().slice(0, 120),
-              sets,
-              measurement: "reps",
-              repScheme: e.repScheme === "failure" ? "failure" : "fixed",
-              repsMin:
-                e.repScheme === "failure"
-                  ? null
-                  : Math.min(999, Math.max(1, Math.round(e.repsMin ?? 10))),
-              repsMax: null,
-              timeSeconds: null,
-              restOverrideSeconds: null,
-              note: e.note?.trim().slice(0, 500) || null,
-              weightUnit: e.weightUnit === "bricks" ? "bricks" : "kg",
-              targetWeight: null,
-            })
-            .returning({ id: schema.exercises.id });
-
-          for (const [ci, cell] of e.cells.entries()) {
-            const sessionId = sessionIds[ci];
-            if (!cell || !sessionId) continue;
-            const logs = cell.sets
-              .filter((s) => s.setNumber >= 1 && s.setNumber <= sets)
-              .map((s) => ({
-                sessionId,
-                exerciseId: exercise.id,
-                setNumber: Math.round(s.setNumber),
-                weight: s.weight,
-                reps: s.reps == null ? null : Math.round(s.reps),
-                timeSeconds: null,
-              }));
-            if (logs.length) await tx.insert(schema.setLogs).values(logs);
-            if (cell.note?.trim()) {
-              await tx.insert(schema.sessionNotes).values({
-                sessionId,
-                exerciseId: exercise.id,
-                note: cell.note.trim().slice(0, 500),
-              });
-            }
-          }
-        }
-      }
+          return {
+            variationId: variation.id,
+            position: i,
+            lineageId: crypto.randomUUID(),
+            sectionName: e.sectionName?.trim().slice(0, 40) || null,
+            supersetKey: key,
+            name: e.name.trim().slice(0, 120),
+            sets,
+            measurement: "reps" as const,
+            repScheme: e.repScheme,
+            repsMin: e.repScheme === "failure" ? null : Math.min(999, Math.max(1, Math.round(e.repsMin ?? 10))),
+            repsMax: e.repScheme === "range" ? Math.min(999, Math.max(1, Math.round(e.repsMax ?? 15))) : null,
+            timeSeconds: null,
+            restOverrideSeconds: null,
+            note: e.note?.trim().slice(0, 500) || null,
+            weightUnit: e.weightUnit === "bricks" ? ("bricks" as const) : ("kg" as const),
+            targetWeight: e.targetWeight == null ? null : Math.max(0, e.targetWeight),
+          };
+        });
+      if (rows.length) await tx.insert(schema.exercises).values(rows);
     }
   });
-
   revalidatePath("/workouts");
-  redirect("/workouts");
+  redirect(firstDayId ? `/workouts/${firstDayId}` : "/workouts");
 }
