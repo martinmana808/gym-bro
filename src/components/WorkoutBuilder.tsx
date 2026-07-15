@@ -14,7 +14,7 @@ let clientId = 0;
 const nextKey = () => `new-${++clientId}`;
 
 type ExerciseDraft = ExerciseInput & { key: string };
-type BlockDraft = { id?: string; key: string; exercises: ExerciseDraft[] };
+type BlockDraft = { id?: string; key: string; sectionName: string | null; exercises: ExerciseDraft[] };
 
 const emptyExercise = (): ExerciseDraft => ({
   key: nextKey(),
@@ -28,6 +28,7 @@ const emptyExercise = (): ExerciseDraft => ({
   restOverrideSeconds: null,
   note: null,
   weightUnit: "kg" as const,
+  targetWeight: null,
 });
 
 const field =
@@ -47,8 +48,9 @@ export function WorkoutBuilder({
     initial?.blocks.map((b) => ({
       id: b.id,
       key: b.id ?? nextKey(),
+      sectionName: b.sectionName ?? null,
       exercises: b.exercises.map((e) => ({ ...e, key: e.id ?? nextKey() })),
-    })) ?? [{ key: nextKey(), exercises: [emptyExercise()] }],
+    })) ?? [{ key: nextKey(), sectionName: null, exercises: [emptyExercise()] }],
   );
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -68,6 +70,7 @@ export function WorkoutBuilder({
       defaultRestSeconds: rest,
       blocks: blocks.map((b) => ({
         id: b.id,
+        sectionName: b.sectionName,
         exercises: b.exercises.map((e) => ({
           id: e.id,
           name: e.name,
@@ -80,6 +83,7 @@ export function WorkoutBuilder({
           restOverrideSeconds: e.restOverrideSeconds,
           note: e.note,
           weightUnit: e.weightUnit,
+          targetWeight: e.targetWeight,
         })),
       })),
     };
@@ -168,6 +172,17 @@ export function WorkoutBuilder({
             </div>
           </header>
 
+          <input
+            className={field}
+            value={block.sectionName ?? ""}
+            onChange={(ev) =>
+              setBlocks((bs) =>
+                bs.map((b, i) => (i === bi ? { ...b, sectionName: ev.target.value || null } : b)),
+              )
+            }
+            placeholder="Muscle group (e.g. Pecs) — optional"
+          />
+
           <div className="flex flex-col gap-4">
             {block.exercises.map((e, ei) => (
               <div
@@ -249,6 +264,23 @@ export function WorkoutBuilder({
                       <option value="kg">Kilograms</option>
                       <option value="bricks">Bricks (machine stack)</option>
                     </select>
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs text-zinc-500">Target weight ({e.weightUnit === "bricks" ? "bricks" : "kg"})</span>
+                    <input
+                      className={field}
+                      type="number"
+                      min={0}
+                      inputMode="decimal"
+                      step={e.weightUnit === "bricks" ? 1 : 2.5}
+                      value={e.targetWeight ?? ""}
+                      placeholder="—"
+                      onChange={(ev) =>
+                        patchExercise(bi, ei, {
+                          targetWeight: ev.target.value === "" ? null : Number(ev.target.value),
+                        })
+                      }
+                    />
                   </label>
 
                   {e.measurement === "reps" ? (
@@ -374,7 +406,9 @@ export function WorkoutBuilder({
       <button
         type="button"
         className="rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
-        onClick={() => setBlocks((bs) => [...bs, { key: nextKey(), exercises: [emptyExercise()] }])}
+        onClick={() =>
+          setBlocks((bs) => [...bs, { key: nextKey(), sectionName: null, exercises: [emptyExercise()] }])
+        }
       >
         + Add exercise block
       </button>
