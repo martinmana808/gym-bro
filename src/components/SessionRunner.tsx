@@ -10,6 +10,7 @@ import {
   formatClock,
   formatLoggedSet,
   formatTarget,
+  formatTargetWeight,
   type RunnerBlock,
   type SetEntry,
   type SetStep,
@@ -91,7 +92,9 @@ export function SessionRunner({
     const lastWeightThisSession = [...logs.values()]
       .filter((l) => l.exerciseId === step.exercise.id && l.weight != null)
       .at(-1)?.weight;
-    setWeight(`${existing?.weight ?? prev?.weight ?? lastWeightThisSession ?? ""}`);
+    setWeight(
+      `${existing?.weight ?? step.exercise.targetWeight ?? prev?.weight ?? lastWeightThisSession ?? ""}`,
+    );
     setReps(`${existing?.reps ?? prev?.reps ?? step.exercise.repsMin ?? ""}`);
     setSeconds(`${existing?.timeSeconds ?? prev?.timeSeconds ?? step.exercise.timeSeconds ?? ""}`);
   }
@@ -258,6 +261,7 @@ export function SessionRunner({
             <div className="mt-3 flex flex-wrap gap-2 text-sm">
               <span className="rounded-full bg-zinc-800/80 px-3 py-1 text-zinc-300">
                 Target {formatTarget(step.exercise)}
+                {step.exercise.targetWeight != null ? ` · ${formatTargetWeight(step.exercise)}` : ""}
               </span>
               {prev && (
                 <span className="rounded-full bg-zinc-800/80 px-3 py-1 tabular-nums text-zinc-400">

@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireUserId } from "@/auth";
@@ -15,6 +16,7 @@ import {
   formatSeconds,
   formatSessionCell,
   formatTarget,
+  formatTargetWeight,
 } from "@/lib/workout";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { VariationsBar } from "@/components/VariationsBar";
@@ -122,28 +124,37 @@ export default async function WorkoutDetailPage({
           Plan
         </h2>
         <div className="flex flex-col gap-3">
-          {blocks.map((block) => (
-            <div
-              key={block.id}
-              className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4"
-            >
-              {block.exercises.length > 1 && (
-                <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                  {blockLabel(block.exercises.length)}
-                </p>
-              )}
-              {block.exercises.map((e) => (
-                <div key={e.id} className="flex items-baseline justify-between gap-3 py-1">
-                  <span className="font-medium">{e.name}</span>
-                  <span className="whitespace-nowrap text-sm text-zinc-400">
-                    {formatTarget(e)}
-                    {e.restOverrideSeconds != null &&
-                      ` · rest ${formatSeconds(e.restOverrideSeconds)}`}
-                  </span>
+          {blocks.map((block, i) => {
+            const section = block.exercises[0]?.sectionName ?? null;
+            const prevSection = i > 0 ? (blocks[i - 1].exercises[0]?.sectionName ?? null) : null;
+            const showHeader = section && section !== prevSection;
+            return (
+              <div key={block.id} className="flex flex-col gap-1">
+                {showHeader && (
+                  <p className="mt-2 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-400">
+                    {section}
+                  </p>
+                )}
+                <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4">
+                  {block.exercises.length > 1 && (
+                    <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
+                      {blockLabel(block.exercises.length)}
+                    </p>
+                  )}
+                  {block.exercises.map((e) => (
+                    <div key={e.id} className="flex items-baseline justify-between gap-3 py-1">
+                      <span className="font-medium">{e.name}</span>
+                      <span className="whitespace-nowrap text-sm text-zinc-400">
+                        {formatTarget(e)}
+                        {e.targetWeight != null && ` · ${formatTargetWeight(e)}`}
+                        {e.restOverrideSeconds != null && ` · rest ${formatSeconds(e.restOverrideSeconds)}`}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          ))}
+              </div>
+            );
+          })}
           {blocks.length === 0 && (
             <p className="text-sm text-zinc-500">No exercises yet — hit Edit to add some.</p>
           )}
@@ -196,49 +207,61 @@ export default async function WorkoutDetailPage({
                 </tr>
               </thead>
               <tbody>
-                {exercisesInOrder.map((e) => {
+                {exercisesInOrder.map((e, idx) => {
                   const group = groupOf.get(e.id);
                   const grouped = (group?.size ?? 1) > 1;
+                  const section = e.sectionName ?? null;
+                  const prevSection = idx > 0 ? (exercisesInOrder[idx - 1].sectionName ?? null) : null;
+                  const showSection = section && section !== prevSection;
                   return (
-                  <tr
-                    key={e.id}
-                    className="border-b border-zinc-800/60 last:border-0 even:bg-zinc-900/30"
-                  >
-                    <td
-                      className={`px-3 py-2.5 font-medium ${
-                        grouped ? "border-l-2 border-lime-400/50" : ""
-                      }`}
-                    >
-                      {e.name}
-                      {grouped && group?.firstId === e.id && (
-                        <span className="ml-2 rounded bg-lime-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-400/80">
-                          {group.label}
-                        </span>
+                    <Fragment key={e.id}>
+                      {showSection && (
+                        <tr className="border-b border-zinc-800/60 bg-zinc-900/40">
+                          <td
+                            colSpan={3 + columns.length}
+                            className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-400"
+                          >
+                            {section}
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td className="px-3 py-2.5 text-zinc-400">{formatTarget(e)}</td>
-                    <td className="px-3 py-2.5 tabular-nums text-zinc-300">
-                      {formatCurrentWeight(currentWeight(e.id), e.weightUnit)}
-                    </td>
-                    {columns.map((s) => {
-                      const logs = (history.logsBySession[s.id] ?? []).filter(
-                        (l) => l.exerciseId === e.id,
-                      );
-                      const note = (history.notesBySession[s.id] ?? []).find(
-                        (n) => n.exerciseId === e.id,
-                      )?.note;
-                      return (
-                        <td key={s.id} className="whitespace-nowrap px-3 py-2.5 tabular-nums">
-                          {formatSessionCell(logs, e.weightUnit, currentWeight(e.id))}
-                          {note && (
-                            <span title={note} className="ml-0.5 cursor-help text-lime-400">
-                              *
+                      <tr className="border-b border-zinc-800/60 last:border-0 even:bg-zinc-900/30">
+                        <td
+                          className={`px-3 py-2.5 font-medium ${
+                            grouped ? "border-l-2 border-lime-400/50" : ""
+                          }`}
+                        >
+                          {e.name}
+                          {grouped && group?.firstId === e.id && (
+                            <span className="ml-2 rounded bg-lime-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-400/80">
+                              {group.label}
                             </span>
                           )}
                         </td>
-                      );
-                    })}
-                  </tr>
+                        <td className="px-3 py-2.5 text-zinc-400">{formatTarget(e)}</td>
+                        <td className="px-3 py-2.5 tabular-nums text-zinc-300">
+                          {formatCurrentWeight(currentWeight(e.id), e.weightUnit)}
+                        </td>
+                        {columns.map((s) => {
+                          const logs = (history.logsBySession[s.id] ?? []).filter(
+                            (l) => l.exerciseId === e.id,
+                          );
+                          const note = (history.notesBySession[s.id] ?? []).find(
+                            (n) => n.exerciseId === e.id,
+                          )?.note;
+                          return (
+                            <td key={s.id} className="whitespace-nowrap px-3 py-2.5 tabular-nums">
+                              {formatSessionCell(logs, e.weightUnit, currentWeight(e.id))}
+                              {note && (
+                                <span title={note} className="ml-0.5 cursor-help text-lime-400">
+                                  *
+                                </span>
+                              )}
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    </Fragment>
                   );
                 })}
               </tbody>
