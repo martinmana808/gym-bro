@@ -22,7 +22,7 @@ export default async function EditWorkoutPage({
   if (!variationId) notFound();
   const structure = await getVariationStructure(variationId, userId);
   if (!structure) notFound();
-  const { workout, blocks } = structure;
+  const { workout, blocks, variation } = structure;
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 py-6">
@@ -34,8 +34,34 @@ export default async function EditWorkoutPage({
         >
           ←
         </Link>
-        <h1 className="text-2xl font-bold tracking-tight">Edit workout</h1>
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold tracking-tight">Edit workout</h1>
+          <p className="truncate text-sm text-zinc-400">
+            {workout.name} · editing <span className="text-lime-400">{variation.name}</span>
+          </p>
+        </div>
       </header>
+
+      {/* Switch which variation you're editing. Unsaved changes are not carried across. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">
+          Variation
+        </span>
+        {variations.map((va) => (
+          <Link
+            key={va.id}
+            href={`/workouts/${id}/edit?v=${va.id}`}
+            className={`rounded-full border px-3 py-1.5 text-sm transition ${
+              va.id === variationId
+                ? "border-lime-400 bg-lime-400/10 font-medium text-lime-400"
+                : "border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+            }`}
+          >
+            {va.name}
+          </Link>
+        ))}
+      </div>
+
       <WorkoutBuilder
         variationId={variationId}
         initial={{
