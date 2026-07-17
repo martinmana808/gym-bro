@@ -319,7 +319,7 @@ export function WorkoutBuilder({
                       {e.repScheme === "range" && (
                         <div className="grid grid-cols-2 gap-2">
                           <label className="flex flex-col gap-1">
-                            <span className="text-xs text-zinc-500">Min</span>
+                            <span className="text-xs text-zinc-500">Between</span>
                             <input
                               className={field}
                               type="number"
@@ -332,7 +332,7 @@ export function WorkoutBuilder({
                             />
                           </label>
                           <label className="flex flex-col gap-1">
-                            <span className="text-xs text-zinc-500">Max</span>
+                            <span className="text-xs text-zinc-500">and</span>
                             <input
                               className={field}
                               type="number"

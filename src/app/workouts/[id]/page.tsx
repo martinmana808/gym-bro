@@ -46,8 +46,9 @@ export default async function WorkoutDetailPage({
   const structure = await getVariationStructure(activeId, userId);
   if (!structure) notFound();
   const { workout, blocks } = structure;
-  // Oldest → newest, like the week columns of the spreadsheet.
-  const columns = [...history.sessions].reverse();
+  // Only THIS variation's sessions — a variation's history is its own, not the
+  // whole day's. Oldest → newest, like the week columns of the spreadsheet.
+  const columns = history.sessions.filter((s) => s.variationId === activeId).reverse();
   const exercisesInOrder = blocks.flatMap((b) => b.exercises);
   // Which block each exercise belongs to, so the history table can mark
   // supersets/trisets the same way the plan groups them.
@@ -195,11 +196,6 @@ export default async function WorkoutDetailPage({
                           <span className="block text-[11px] font-normal tabular-nums text-zinc-500">
                             {durationSeconds > 0 ? formatClock(durationSeconds) : "—"}
                           </span>
-                          {history.variationNameBySession[s.id] && (
-                            <span className="block text-[11px] font-normal text-zinc-600">
-                              {history.variationNameBySession[s.id]}
-                            </span>
-                          )}
                         </Link>
                       </th>
                     );

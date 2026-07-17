@@ -43,6 +43,8 @@ export default async function EditWorkoutPage({
           defaultRestSeconds: workout.defaultRestSeconds,
           blocks: blocks.map((b) => ({
             id: b.id,
+            // All exercises in a block share the block's section; read it off the first.
+            sectionName: b.exercises[0]?.sectionName ?? null,
             exercises: b.exercises.map((e) => ({
               id: e.id,
               name: e.name,
@@ -55,6 +57,7 @@ export default async function EditWorkoutPage({
               restOverrideSeconds: e.restOverrideSeconds,
               note: e.note,
               weightUnit: e.weightUnit,
+              targetWeight: e.targetWeight,
             })),
           })),
         }}
