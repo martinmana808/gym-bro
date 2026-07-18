@@ -5,7 +5,11 @@ import { eq } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 
 export const hasGoogle = Boolean(process.env.AUTH_GOOGLE_ID && process.env.AUTH_GOOGLE_SECRET);
-export const hasDevLogin = process.env.NODE_ENV !== "production";
+// Dev login is on outside production. It can also be force-enabled in a
+// production build via ALLOW_DEV_LOGIN=true — useful for a personal single-user
+// deployment or running a local production server for phone access on your LAN.
+export const hasDevLogin =
+  process.env.NODE_ENV !== "production" || process.env.ALLOW_DEV_LOGIN === "true";
 
 const providers: NextAuthConfig["providers"] = [];
 if (hasGoogle) providers.push(Google);
