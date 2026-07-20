@@ -125,7 +125,7 @@ export async function createWorkout(input: WorkoutInput) {
       .returning({ id: schema.days.id });
     const [variation] = await tx
       .insert(schema.variations)
-      .values({ dayId: day.id, position: 0, name: "Base" })
+      .values({ dayId: day.id, position: 0, name: "Week 1" })
       .returning({ id: schema.variations.id });
     const rows = flattenBlockExercises(data.blocks, variation.id);
     if (rows.length) await tx.insert(schema.exercises).values(rows);
@@ -159,7 +159,7 @@ async function ownedVariation(variationId: string, userId: string) {
 export async function createVariation(dayId: string, sourceVariationId: string) {
   const userId = await requireUserId();
   await ownedDay(dayId, userId);
-  const source = await ownedVariation(sourceVariationId, userId);
+  await ownedVariation(sourceVariationId, userId); // throws if not owned
   const db = await getDb();
   const siblings = await db.query.variations.findMany({ where: eq(schema.variations.dayId, dayId) });
   const sourceExercises = await db.query.exercises.findMany({
@@ -170,7 +170,7 @@ export async function createVariation(dayId: string, sourceVariationId: string) 
   await db.transaction(async (tx) => {
     const [v] = await tx
       .insert(schema.variations)
-      .values({ dayId, position: siblings.length, name: `${source.name} copy`.slice(0, 60) })
+      .values({ dayId, position: siblings.length, name: `Week ${siblings.length + 1}`.slice(0, 60) })
       .returning({ id: schema.variations.id });
     newId = v.id;
     if (sourceExercises.length) {
@@ -461,7 +461,7 @@ export async function importProgram(programName: string, days: ImportProgramDay[
       if (di === 0) firstDayId = day.id;
       const [variation] = await tx
         .insert(schema.variations)
-        .values({ dayId: day.id, position: 0, name: "Base" })
+        .values({ dayId: day.id, position: 0, name: "Week 1" })
         .returning({ id: schema.variations.id });
       let prevGroup: string | null = null;
       let key = crypto.randomUUID();

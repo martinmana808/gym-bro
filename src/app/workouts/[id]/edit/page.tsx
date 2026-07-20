@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { requireUserId } from "@/auth";
 import { getVariationStructure, listDayVariations } from "@/db/queries";
 import { WorkoutBuilder } from "@/components/WorkoutBuilder";
+import { VariationNameField } from "@/components/VariationNameField";
 
 export const dynamic = "force-dynamic";
 
@@ -61,6 +62,8 @@ export default async function EditWorkoutPage({
           </Link>
         ))}
       </div>
+
+      <VariationNameField variationId={variationId} name={variation.name} />
 
       <WorkoutBuilder
         variationId={variationId}
