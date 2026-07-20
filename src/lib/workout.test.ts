@@ -10,6 +10,7 @@ import {
   formatTargetWeight,
   formatWeight,
   groupExercisesIntoBlocks,
+  numberOptions,
   type LoggedSet,
   type RunnerExercise,
 } from "./workout";
@@ -216,5 +217,28 @@ describe("groupExercisesIntoBlocks", () => {
 
   it("returns [] for empty input", () => {
     expect(groupExercisesIntoBlocks([])).toEqual([]);
+  });
+});
+
+describe("numberOptions", () => {
+  it("generates an inclusive range by step, trimmed", () => {
+    expect(numberOptions(0, 10, 2.5)).toEqual(["0", "2.5", "5", "7.5", "10"]);
+    expect(numberOptions(1, 5, 1)).toEqual(["1", "2", "3", "4", "5"]);
+  });
+  it("has no float drift at 2.5 steps", () => {
+    expect(numberOptions(0, 300, 2.5)).toContain("22.5");
+    expect(numberOptions(0, 300, 2.5)).toContain("300");
+    expect(numberOptions(0, 300, 2.5).some((o) => o.includes("."))).toBe(true);
+    expect(numberOptions(0, 300, 2.5).every((o) => Number.isFinite(Number(o)))).toBe(true);
+  });
+  it("includes an off-step current value, sorted in", () => {
+    const opts = numberOptions(0, 300, 2.5, { current: "63" });
+    expect(opts).toContain("63");
+    expect(opts.indexOf("63")).toBeGreaterThan(opts.indexOf("62.5"));
+    expect(opts.indexOf("63")).toBeLessThan(opts.indexOf("65"));
+  });
+  it("ignores a current value that is blank or already present", () => {
+    expect(numberOptions(1, 10, 1, { current: "" })).toEqual(numberOptions(1, 10, 1));
+    expect(numberOptions(1, 10, 1, { current: "5" })).toEqual(numberOptions(1, 10, 1));
   });
 });

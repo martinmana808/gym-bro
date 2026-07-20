@@ -171,6 +171,28 @@ export function formatClock(totalSeconds: number): string {
   return `${h > 0 ? `${h}:` : ""}${mm}:${s.toString().padStart(2, "0")}`;
 }
 
+/** Option values for a NumberSelect: min..max inclusive by step, trimmed of
+ * trailing zeros; an off-step `current` value is inserted (sorted) so a saved
+ * value is never dropped. */
+export function numberOptions(
+  min: number,
+  max: number,
+  step: number,
+  opts?: { current?: string },
+): string[] {
+  const out: string[] = [];
+  const decimals = (`${step}`.split(".")[1] ?? "").length;
+  for (let v = min; v <= max + 1e-9; v += step) {
+    out.push(trimNumber(Number(v.toFixed(decimals))));
+  }
+  const cur = opts?.current;
+  if (cur && cur.trim() !== "" && Number.isFinite(Number(cur)) && !out.includes(cur)) {
+    out.push(cur);
+    out.sort((a, b) => Number(a) - Number(b));
+  }
+  return out;
+}
+
 function trimNumber(n: number): string {
   return Number.isInteger(n) ? `${n}` : `${n}`.replace(/(\.\d\d).*$/, "$1");
 }
