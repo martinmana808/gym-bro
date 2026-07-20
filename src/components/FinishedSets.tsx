@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { logSet } from "@/app/actions";
-import { NumberField } from "@/components/NumberField";
+import { NumberSelect } from "@/components/NumberSelect";
 import { SetGrid } from "@/components/SetGrid";
 import {
   formatLoggedSet,
@@ -140,17 +140,29 @@ function SetEditor({
         </p>
         <h3 className="mt-1 text-xl font-bold tracking-tight">{exercise.name}</h3>
         <div className="mt-4 flex flex-col gap-3">
-          <NumberField
-            label={unit === "bricks" ? "Weight (bricks)" : "Weight (kg)"}
-            value={weight}
-            onChange={setWeight}
-            step={unit === "bricks" ? 1 : 2.5}
-            decimal={unit !== "bricks"}
-          />
+          <label className="flex flex-col gap-1.5">
+            <span className="text-sm text-zinc-400">
+              {unit === "bricks" ? "Weight (bricks)" : "Weight (kg)"}
+            </span>
+            <NumberSelect
+              value={weight}
+              onChange={setWeight}
+              min={unit === "bricks" ? 1 : 0}
+              max={unit === "bricks" ? 25 : 300}
+              step={unit === "bricks" ? 1 : 2.5}
+              blank
+            />
+          </label>
           {isTime ? (
-            <NumberField label="Seconds" value={seconds} onChange={setSeconds} step={5} />
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm text-zinc-400">Seconds</span>
+              <NumberSelect value={seconds} onChange={setSeconds} min={5} max={300} step={5} />
+            </label>
           ) : (
-            <NumberField label="Reps" value={reps} onChange={setReps} step={1} />
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm text-zinc-400">Reps</span>
+              <NumberSelect value={reps} onChange={setReps} min={0} max={60} step={1} />
+            </label>
           )}
         </div>
         <button

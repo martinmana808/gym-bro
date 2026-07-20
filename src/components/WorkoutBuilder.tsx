@@ -9,6 +9,7 @@ import {
   type WorkoutInput,
 } from "@/app/actions";
 import { blockLabel } from "@/lib/workout";
+import { NumberSelect } from "@/components/NumberSelect";
 
 let clientId = 0;
 const nextKey = () => `new-${++clientId}`;
@@ -117,13 +118,12 @@ export function WorkoutBuilder({
 
       <label className="flex flex-col gap-1.5">
         <span className="text-sm text-zinc-400">Default rest between sets (seconds)</span>
-        <input
-          className={field}
-          type="number"
+        <NumberSelect
           min={0}
-          inputMode="numeric"
-          value={rest}
-          onChange={(e) => setRest(Number(e.target.value))}
+          max={300}
+          step={5}
+          value={`${rest}`}
+          onChange={(v) => setRest(Number(v))}
         />
       </label>
 
@@ -226,13 +226,12 @@ export function WorkoutBuilder({
                 <div className="grid grid-cols-2 gap-2">
                   <label className="flex flex-col gap-1">
                     <span className="text-xs text-zinc-500">Sets</span>
-                    <input
-                      className={field}
-                      type="number"
+                    <NumberSelect
                       min={1}
-                      inputMode="numeric"
-                      value={e.sets}
-                      onChange={(ev) => patchExercise(bi, ei, { sets: Number(ev.target.value) })}
+                      max={10}
+                      step={1}
+                      value={`${e.sets}`}
+                      onChange={(v) => patchExercise(bi, ei, { sets: Number(v) })}
                     />
                   </label>
                   <label className="flex flex-col gap-1">
@@ -267,17 +266,15 @@ export function WorkoutBuilder({
                   </label>
                   <label className="flex flex-col gap-1">
                     <span className="text-xs text-zinc-500">Target weight ({e.weightUnit === "bricks" ? "bricks" : "kg"})</span>
-                    <input
-                      className={field}
-                      type="number"
-                      min={0}
-                      inputMode="decimal"
+                    <NumberSelect
+                      min={e.weightUnit === "bricks" ? 1 : 0}
+                      max={e.weightUnit === "bricks" ? 25 : 300}
                       step={e.weightUnit === "bricks" ? 1 : 2.5}
-                      value={e.targetWeight ?? ""}
-                      placeholder="—"
-                      onChange={(ev) =>
+                      blank
+                      value={e.targetWeight == null ? "" : `${e.targetWeight}`}
+                      onChange={(v) =>
                         patchExercise(bi, ei, {
-                          targetWeight: ev.target.value === "" ? null : Number(ev.target.value),
+                          targetWeight: v === "" ? null : Number(v),
                         })
                       }
                     />
@@ -304,15 +301,12 @@ export function WorkoutBuilder({
                       {e.repScheme === "fixed" && (
                         <label className="flex flex-col gap-1">
                           <span className="text-xs text-zinc-500">Reps</span>
-                          <input
-                            className={field}
-                            type="number"
+                          <NumberSelect
                             min={1}
-                            inputMode="numeric"
-                            value={e.repsMin ?? ""}
-                            onChange={(ev) =>
-                              patchExercise(bi, ei, { repsMin: Number(ev.target.value) })
-                            }
+                            max={50}
+                            step={1}
+                            value={e.repsMin == null ? "" : `${e.repsMin}`}
+                            onChange={(v) => patchExercise(bi, ei, { repsMin: Number(v) })}
                           />
                         </label>
                       )}
@@ -320,28 +314,22 @@ export function WorkoutBuilder({
                         <div className="grid grid-cols-2 gap-2">
                           <label className="flex flex-col gap-1">
                             <span className="text-xs text-zinc-500">From</span>
-                            <input
-                              className={field}
-                              type="number"
+                            <NumberSelect
                               min={1}
-                              inputMode="numeric"
-                              value={e.repsMin ?? ""}
-                              onChange={(ev) =>
-                                patchExercise(bi, ei, { repsMin: Number(ev.target.value) })
-                              }
+                              max={50}
+                              step={1}
+                              value={e.repsMin == null ? "" : `${e.repsMin}`}
+                              onChange={(v) => patchExercise(bi, ei, { repsMin: Number(v) })}
                             />
                           </label>
                           <label className="flex flex-col gap-1">
                             <span className="text-xs text-zinc-500">To</span>
-                            <input
-                              className={field}
-                              type="number"
+                            <NumberSelect
                               min={1}
-                              inputMode="numeric"
-                              value={e.repsMax ?? ""}
-                              onChange={(ev) =>
-                                patchExercise(bi, ei, { repsMax: Number(ev.target.value) })
-                              }
+                              max={50}
+                              step={1}
+                              value={e.repsMax == null ? "" : `${e.repsMax}`}
+                              onChange={(v) => patchExercise(bi, ei, { repsMax: Number(v) })}
                             />
                           </label>
                         </div>
@@ -350,32 +338,28 @@ export function WorkoutBuilder({
                   ) : (
                     <label className="flex flex-col gap-1">
                       <span className="text-xs text-zinc-500">Duration (seconds)</span>
-                      <input
-                        className={field}
-                        type="number"
-                        min={1}
-                        inputMode="numeric"
-                        value={e.timeSeconds ?? ""}
-                        onChange={(ev) =>
-                          patchExercise(bi, ei, { timeSeconds: Number(ev.target.value) })
-                        }
+                      <NumberSelect
+                        min={5}
+                        max={300}
+                        step={5}
+                        value={e.timeSeconds == null ? "" : `${e.timeSeconds}`}
+                        onChange={(v) => patchExercise(bi, ei, { timeSeconds: Number(v) })}
                       />
                     </label>
                   )}
 
                   <label className="flex flex-col gap-1">
                     <span className="text-xs text-zinc-500">Rest override (s)</span>
-                    <input
-                      className={field}
-                      type="number"
+                    <NumberSelect
                       min={0}
-                      inputMode="numeric"
-                      value={e.restOverrideSeconds ?? ""}
-                      placeholder="default"
-                      onChange={(ev) =>
+                      max={300}
+                      step={5}
+                      blank
+                      blankLabel="default"
+                      value={e.restOverrideSeconds == null ? "" : `${e.restOverrideSeconds}`}
+                      onChange={(v) =>
                         patchExercise(bi, ei, {
-                          restOverrideSeconds:
-                            ev.target.value === "" ? null : Number(ev.target.value),
+                          restOverrideSeconds: v === "" ? null : Number(v),
                         })
                       }
                     />
