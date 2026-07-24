@@ -7,6 +7,7 @@ import { requireUserId } from "@/auth";
 import { getDb, schema } from "@/db";
 import type { Measurement, RepScheme } from "@/db/schema";
 import type { WeightUnit } from "@/lib/workout";
+import { deriveWeeks } from "@/lib/weeks";
 
 export type ExerciseInput = {
   id?: string;
@@ -154,6 +155,16 @@ async function ownedVariation(variationId: string, userId: string) {
   if (!v) throw new Error("Variation not found");
   await ownedDay(v.dayId, userId); // throws if not owned
   return v;
+}
+
+/** Verify the program belongs to the user; return it. */
+async function ownedProgram(programId: string, userId: string) {
+  const db = await getDb();
+  const p = await db.query.programs.findFirst({
+    where: and(eq(schema.programs.id, programId), eq(schema.programs.userId, userId)),
+  });
+  if (!p) throw new Error("Workout not found");
+  return p;
 }
 
 export async function createVariation(dayId: string, sourceVariationId: string) {
@@ -496,4 +507,179 @@ export async function importProgram(programName: string, days: ImportProgramDay[
   });
   revalidatePath("/workouts");
   redirect(firstDayId ? `/workouts/${firstDayId}` : "/workouts");
+}
+
+/** Add a day to a workout. The new day gets an (empty) cell for every existing
+ * week so it is trainable in each. */
+export async function addDay(programId: string) {
+  const userId = await requireUserId();
+  await ownedProgram(programId, userId);
+  const db = await getDb();
+  const days = await db.query.days.findMany({
+    where: eq(schema.days.programId, programId),
+    orderBy: asc(schema.days.position),
+  });
+  const allVars = days.length
+    ? await db.query.variations.findMany({
+        where: inArray(schema.variations.dayId, days.map((d) => d.id)),
+      })
+    : [];
+  const byDay = days.map((d) => allVars.filter((v) => v.dayId === d.id));
+  const weeks = deriveWeeks(byDay.map((vs) => vs.map((v) => ({ position: v.position, name: v.name }))));
+  const cols = weeks.length ? weeks : [{ position: 0, name: "Week 1" }];
+  await db.transaction(async (tx) => {
+    const [day] = await tx
+      .insert(schema.days)
+      .values({ programId, position: days.length, name: `Day ${days.length + 1}`, defaultRestSeconds: 90 })
+      .returning({ id: schema.days.id });
+    await tx.insert(schema.variations).values(
+      cols.map((c) => ({ dayId: day.id, position: c.position, name: c.name })),
+    );
+  });
+  revalidatePath(`/workouts/${programId}`);
+  redirect(`/workouts/${programId}`);
+}
+
+export async function renameDay(dayId: string, name: string) {
+  const userId = await requireUserId();
+  const day = await ownedDay(dayId, userId);
+  const db = await getDb();
+  await db
+    .update(schema.days)
+    .set({ name: name.trim().slice(0, 80) || "Day" })
+    .where(eq(schema.days.id, dayId));
+  revalidatePath(`/workouts/${day.programId}`);
+}
+
+/** Delete a day (cascades its variations/exercises/sessions). Deleting the last
+ * day deletes the whole workout. */
+export async function deleteDay(dayId: string) {
+  const userId = await requireUserId();
+  const day = await ownedDay(dayId, userId);
+  const db = await getDb();
+  await db.delete(schema.days).where(eq(schema.days.id, dayId));
+  const remaining = await db.query.days.findFirst({
+    where: eq(schema.days.programId, day.programId),
+  });
+  if (!remaining) {
+    await db.delete(schema.programs).where(eq(schema.programs.id, day.programId));
+    revalidatePath("/workouts");
+    redirect("/workouts");
+  }
+  revalidatePath(`/workouts/${day.programId}`);
+  redirect(`/workouts/${day.programId}`);
+}
+
+export async function deleteProgram(programId: string) {
+  const userId = await requireUserId();
+  await ownedProgram(programId, userId);
+  const db = await getDb();
+  await db.delete(schema.programs).where(eq(schema.programs.id, programId));
+  revalidatePath("/workouts");
+  redirect("/workouts");
+}
+
+/** Add a week to a workout by copying `sourceWeekPos` forward for every day
+ * (exercises included, fresh lineage — a copy until the user aligns it). */
+export async function addWeek(programId: string, sourceWeekPos: number) {
+  const userId = await requireUserId();
+  await ownedProgram(programId, userId);
+  const db = await getDb();
+  const days = await db.query.days.findMany({ where: eq(schema.days.programId, programId) });
+  const allVars = days.length
+    ? await db.query.variations.findMany({
+        where: inArray(schema.variations.dayId, days.map((d) => d.id)),
+      })
+    : [];
+  const newPos = Math.max(0, ...allVars.map((v) => v.position + 1));
+  // Read each day's source-week exercises up front (outside the tx).
+  const sources = await Promise.all(
+    days.map(async (d) => {
+      const src = allVars.find((v) => v.dayId === d.id && v.position === sourceWeekPos);
+      const exercises = src
+        ? await db.query.exercises.findMany({
+            where: eq(schema.exercises.variationId, src.id),
+            orderBy: asc(schema.exercises.position),
+          })
+        : [];
+      return { dayId: d.id, exercises };
+    }),
+  );
+  await db.transaction(async (tx) => {
+    for (const s of sources) {
+      const [nv] = await tx
+        .insert(schema.variations)
+        .values({ dayId: s.dayId, position: newPos, name: `Week ${newPos + 1}` })
+        .returning({ id: schema.variations.id });
+      if (s.exercises.length) {
+        await tx.insert(schema.exercises).values(
+          s.exercises.map((e) => ({
+            variationId: nv.id,
+            position: e.position,
+            lineageId: crypto.randomUUID(),
+            sectionName: e.sectionName,
+            supersetKey: e.supersetKey,
+            name: e.name,
+            sets: e.sets,
+            measurement: e.measurement,
+            repScheme: e.repScheme,
+            repsMin: e.repsMin,
+            repsMax: e.repsMax,
+            timeSeconds: e.timeSeconds,
+            restOverrideSeconds: e.restOverrideSeconds,
+            note: e.note,
+            weightUnit: e.weightUnit,
+            targetWeight: e.targetWeight,
+          })),
+        );
+      }
+    }
+  });
+  revalidatePath(`/workouts/${programId}`);
+  redirect(`/workouts/${programId}?week=${newPos}`);
+}
+
+/** Rename a week program-wide (updates every day's variation at that position). */
+export async function renameWeek(programId: string, weekPos: number, name: string) {
+  const userId = await requireUserId();
+  await ownedProgram(programId, userId);
+  const db = await getDb();
+  const days = await db.query.days.findMany({ where: eq(schema.days.programId, programId) });
+  const clean = name.trim().slice(0, 60) || `Week ${weekPos + 1}`;
+  await db
+    .update(schema.variations)
+    .set({ name: clean })
+    .where(
+      and(inArray(schema.variations.dayId, days.map((d) => d.id)), eq(schema.variations.position, weekPos)),
+    );
+  revalidatePath(`/workouts/${programId}`);
+}
+
+/** Delete a week from every day and reindex later weeks so positions stay
+ * contiguous. Refuses to delete the last remaining week. */
+export async function deleteWeek(programId: string, weekPos: number) {
+  const userId = await requireUserId();
+  await ownedProgram(programId, userId);
+  const db = await getDb();
+  const days = await db.query.days.findMany({ where: eq(schema.days.programId, programId) });
+  const allVars = days.length
+    ? await db.query.variations.findMany({
+        where: inArray(schema.variations.dayId, days.map((d) => d.id)),
+      })
+    : [];
+  const weekCount = Math.max(0, ...allVars.map((v) => v.position + 1));
+  if (weekCount <= 1) throw new Error("A workout needs at least one week");
+  const toDelete = allVars.filter((v) => v.position === weekPos).map((v) => v.id);
+  const toShift = allVars.filter((v) => v.position > weekPos);
+  await db.transaction(async (tx) => {
+    if (toDelete.length) await tx.delete(schema.variations).where(inArray(schema.variations.id, toDelete));
+    for (const v of toShift) {
+      await tx
+        .update(schema.variations)
+        .set({ position: v.position - 1 })
+        .where(eq(schema.variations.id, v.id));
+    }
+  });
+  revalidatePath(`/workouts/${programId}`);
+  redirect(`/workouts/${programId}`);
 }
