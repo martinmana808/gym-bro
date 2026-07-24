@@ -85,9 +85,11 @@ the training/edit/history pages.
   - Manage controls: **+ Add day**, rename/reorder/delete a day; rename/delete
     the selected week; **+ Week** (copy current week forward).
 - **`/workouts/[programId]/days/[dayId]`** — **Day detail**: the plan for the
-  currently-selected week + the spreadsheet **history grid** for that day (its
-  sessions as columns, each column tagged with the week it belonged to). This is
-  today's day page, re-homed under the program.
+  currently-selected week + the spreadsheet **history grid** for that
+  (day, week) cell. History is **scoped to the selected week**, exactly like
+  today's per-variation history — because each week's cell has its own exercise
+  rows (fresh ids), so cross-week columns can't share rows. Week tabs switch both
+  the plan and the history. This is today's day page, re-homed under the program.
 - **`/workouts/[programId]/days/[dayId]/edit?week=W`** — edit that **cell** via
   the existing `WorkoutBuilder`, saving through `updateVariation` on the day's
   position-`W` variation. Week tabs let you switch which week you're editing.
@@ -102,16 +104,18 @@ internal; they are replaced, not preserved.
 
 New or changed. All authorize via the `program.userId` chain.
 
-- **`createWorkout(name)`** → program + `Day 1` (position 0) + `Week 1`
-  (position 0) + one empty block. Returns to `/workouts/[programId]`.
-  *(Changed: today it takes a full `WorkoutInput`; now it's name-only and you
-  build the first cell on the edit page.)*
+- **`createWorkout(WorkoutInput)`** — **signature unchanged** (the `/workouts/new`
+  page keeps the inline builder so you build Day 1's first cell as you create).
+  It still makes program + `Day 1` + `Week 1` from the built blocks; the only
+  change is it **redirects to the hub** `/workouts/[programId]` instead of the
+  day. Less churn, same first-run UX.
 - **`addDay(programId, name)`** → new day at `position = dayCount`, and for
   **every existing week position** create an empty variation (label copied from
   that week) so the new day is a full column-height. Returns to the hub.
 - **`renameDay(dayId, name)`**, **`deleteDay(dayId)`** (cascade removes its
-  variations/exercises/sessions — confirm in UI), **`moveDay(dayId, dir)`**
-  (swap `position` with neighbor).
+  variations/exercises/sessions — confirm in UI; deleting the last day deletes
+  the workout), **`deleteProgram(programId)`** (delete a whole workout from the
+  hub). Day reordering is out of scope for v1 (days stay in creation order).
 - **`addWeek(programId, sourceWeekPos)`** → for **each day**, copy its
   `sourceWeekPos` variation (exercises included, fresh `lineageId` continuity as
   today's `createVariation`) to `position = weekCount`. Program-global label
@@ -178,8 +182,9 @@ all mutations already keep the grid rectangular, so this is a backstop.
   every week, trainable immediately.
 - **A day with an unfinished session** → still shows a resume badge in the hub;
   deleting weeks/days that own an unfinished session is allowed after confirm.
-- **History across weeks** → a day's history grid shows all its sessions
-  regardless of week, each column tagged with its week label, oldest→newest.
+- **History per week** → a day's history grid shows the selected week's sessions
+  as columns, oldest→newest (scoped like today's per-variation history). Switch
+  the week tab to see another week's history.
 
 ## Testing
 
