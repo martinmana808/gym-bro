@@ -114,12 +114,13 @@ export async function createWorkout(input: WorkoutInput) {
   const userId = await requireUserId();
   const db = await getDb();
   const data = sanitizeWorkout(input);
-  let dayId = "";
+  let programId = "";
   await db.transaction(async (tx) => {
     const [program] = await tx
       .insert(schema.programs)
       .values({ userId, name: data.name })
       .returning({ id: schema.programs.id });
+    programId = program.id;
     const [day] = await tx
       .insert(schema.days)
       .values({ programId: program.id, position: 0, name: data.name, defaultRestSeconds: data.defaultRestSeconds })
@@ -130,10 +131,9 @@ export async function createWorkout(input: WorkoutInput) {
       .returning({ id: schema.variations.id });
     const rows = flattenBlockExercises(data.blocks, variation.id);
     if (rows.length) await tx.insert(schema.exercises).values(rows);
-    dayId = day.id;
   });
   revalidatePath("/workouts");
-  redirect(`/workouts/${dayId}`);
+  redirect(`/workouts/${programId}`);
 }
 
 /** Verify the day belongs to the user; return it (with programId). */
@@ -165,72 +165,6 @@ async function ownedProgram(programId: string, userId: string) {
   });
   if (!p) throw new Error("Workout not found");
   return p;
-}
-
-export async function createVariation(dayId: string, sourceVariationId: string) {
-  const userId = await requireUserId();
-  await ownedDay(dayId, userId);
-  await ownedVariation(sourceVariationId, userId); // throws if not owned
-  const db = await getDb();
-  const siblings = await db.query.variations.findMany({ where: eq(schema.variations.dayId, dayId) });
-  const sourceExercises = await db.query.exercises.findMany({
-    where: eq(schema.exercises.variationId, sourceVariationId),
-    orderBy: asc(schema.exercises.position),
-  });
-  let newId = "";
-  await db.transaction(async (tx) => {
-    const [v] = await tx
-      .insert(schema.variations)
-      .values({ dayId, position: siblings.length, name: `Week ${siblings.length + 1}`.slice(0, 60) })
-      .returning({ id: schema.variations.id });
-    newId = v.id;
-    if (sourceExercises.length) {
-      await tx.insert(schema.exercises).values(
-        sourceExercises.map((e) => ({
-          variationId: v.id,
-          position: e.position,
-          lineageId: crypto.randomUUID(), // fresh: a copy is a new lineage until user aligns it
-          sectionName: e.sectionName,
-          supersetKey: e.supersetKey,
-          name: e.name,
-          sets: e.sets,
-          measurement: e.measurement,
-          repScheme: e.repScheme,
-          repsMin: e.repsMin,
-          repsMax: e.repsMax,
-          timeSeconds: e.timeSeconds,
-          restOverrideSeconds: e.restOverrideSeconds,
-          note: e.note,
-          weightUnit: e.weightUnit,
-          targetWeight: e.targetWeight,
-        })),
-      );
-    }
-  });
-  revalidatePath(`/workouts/${dayId}`);
-  redirect(`/workouts/${dayId}?v=${newId}`);
-}
-
-export async function renameVariation(variationId: string, name: string) {
-  const userId = await requireUserId();
-  const v = await ownedVariation(variationId, userId);
-  const db = await getDb();
-  await db
-    .update(schema.variations)
-    .set({ name: name.trim().slice(0, 60) || "Variation" })
-    .where(eq(schema.variations.id, variationId));
-  revalidatePath(`/workouts/${v.dayId}`);
-}
-
-export async function deleteVariation(variationId: string) {
-  const userId = await requireUserId();
-  const v = await ownedVariation(variationId, userId);
-  const db = await getDb();
-  const siblings = await db.query.variations.findMany({ where: eq(schema.variations.dayId, v.dayId) });
-  if (siblings.length <= 1) throw new Error("A day needs at least one variation");
-  await db.delete(schema.variations).where(eq(schema.variations.id, variationId));
-  revalidatePath(`/workouts/${v.dayId}`);
-  redirect(`/workouts/${v.dayId}`);
 }
 
 /**
@@ -294,22 +228,10 @@ export async function updateVariation(variationId: string, input: WorkoutInput) 
     }
   }
 
+  const day = await db.query.days.findFirst({ where: eq(schema.days.id, dayId) });
   revalidatePath("/workouts");
-  revalidatePath(`/workouts/${dayId}`);
-  redirect(`/workouts/${dayId}?v=${variationId}`);
-}
-
-export async function deleteWorkout(dayId: string) {
-  const userId = await requireUserId();
-  const day = await ownedDay(dayId, userId);
-  const db = await getDb();
-  await db.delete(schema.days).where(eq(schema.days.id, dayId));
-  const remaining = await db.query.days.findFirst({
-    where: eq(schema.days.programId, day.programId),
-  });
-  if (!remaining) await db.delete(schema.programs).where(eq(schema.programs.id, day.programId));
-  revalidatePath("/workouts");
-  redirect("/workouts");
+  revalidatePath(`/workouts/${day!.programId}`);
+  redirect(`/workouts/${day!.programId}/days/${dayId}?week=${variation.position}`);
 }
 
 export async function startSession(dayId: string, variationId?: string) {
@@ -426,7 +348,8 @@ export async function finishSession(sessionId: string) {
       .set({ finishedAt: new Date() })
       .where(eq(schema.sessions.id, sessionId));
   }
-  revalidatePath(`/workouts/${session.dayId}`);
+  const day = await db.query.days.findFirst({ where: eq(schema.days.id, session.dayId) });
+  revalidatePath(`/workouts/${day!.programId}/days/${session.dayId}`);
   revalidatePath("/workouts");
 }
 
@@ -435,8 +358,9 @@ export async function deleteSession(sessionId: string) {
   const session = await ownedSession(sessionId, userId);
   const db = await getDb();
   await db.delete(schema.sessions).where(eq(schema.sessions.id, sessionId));
-  revalidatePath(`/workouts/${session.dayId}`);
-  redirect(`/workouts/${session.dayId}`);
+  const day = await db.query.days.findFirst({ where: eq(schema.days.id, session.dayId) });
+  revalidatePath(`/workouts/${day!.programId}/days/${session.dayId}`);
+  redirect(`/workouts/${day!.programId}/days/${session.dayId}`);
 }
 
 export type ImportProgramExercise = {
@@ -458,18 +382,18 @@ export async function importProgram(programName: string, days: ImportProgramDay[
   // Nothing to import (e.g. a direct call with an empty parse) — don't create an orphan program.
   if (!days.some((d) => d.exercises.some((e) => e.name.trim()))) redirect("/import");
   const db = await getDb();
-  let firstDayId = "";
+  let programId = "";
   await db.transaction(async (tx) => {
     const [program] = await tx
       .insert(schema.programs)
       .values({ userId, name: programName.trim().slice(0, 80) || "Imported program" })
       .returning({ id: schema.programs.id });
+    programId = program.id;
     for (const [di, d] of days.entries()) {
       const [day] = await tx
         .insert(schema.days)
         .values({ programId: program.id, position: di, name: d.name.trim().slice(0, 80) || `Day ${di + 1}`, defaultRestSeconds: 90 })
         .returning({ id: schema.days.id });
-      if (di === 0) firstDayId = day.id;
       const [variation] = await tx
         .insert(schema.variations)
         .values({ dayId: day.id, position: 0, name: "Week 1" })
@@ -506,7 +430,7 @@ export async function importProgram(programName: string, days: ImportProgramDay[
     }
   });
   revalidatePath("/workouts");
-  redirect(firstDayId ? `/workouts/${firstDayId}` : "/workouts");
+  redirect(programId ? `/workouts/${programId}` : "/workouts");
 }
 
 /** Add a day to a workout. The new day gets an (empty) cell for every existing

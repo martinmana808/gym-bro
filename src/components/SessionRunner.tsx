@@ -28,6 +28,7 @@ const isNextRedirect = (e: unknown) => !!e && typeof e === "object" && "digest" 
 
 export function SessionRunner({
   sessionId,
+  programId,
   workoutId,
   workoutName,
   startedAtMs,
@@ -38,6 +39,7 @@ export function SessionRunner({
   initialNotes,
 }: {
   sessionId: string;
+  programId: string;
   workoutId: string;
   workoutName: string;
   startedAtMs: number;
@@ -188,7 +190,7 @@ export function SessionRunner({
     <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
       <header className="flex items-center gap-3 py-4">
         <Link
-          href={`/workouts/${workoutId}`}
+          href={`/workouts/${programId}/days/${workoutId}`}
           aria-label="Leave session — your progress is saved"
           title="Leave session — your progress is saved"
           className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"

@@ -30,6 +30,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     return (
       <SessionRunner
         sessionId={session.id}
+        programId={structure.workout.programId}
         workoutId={structure.workout.id}
         workoutName={structure.workout.name}
         startedAtMs={session.startedAt.getTime()}
@@ -52,7 +53,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pb-10 pt-6">
       <header className="flex items-center gap-3">
         <Link
-          href={`/workouts/${structure.workout.id}`}
+          href={`/workouts/${structure.workout.programId}/days/${structure.workout.id}`}
           aria-label="Back to workout"
           className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
         >

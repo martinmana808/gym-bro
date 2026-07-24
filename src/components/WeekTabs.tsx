@@ -2,41 +2,46 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { createVariation, deleteVariation, renameVariation } from "@/app/actions";
+import { addWeek, renameWeek, deleteWeek } from "@/app/actions";
 
-export function VariationsBar({
-  dayId,
-  variations,
-  activeId,
+/** Week selector for a workout. Links set `?week=<position>`; controls add (copy
+ * current forward), rename (program-wide), and delete the selected week. */
+export function WeekTabs({
+  programId,
+  weeks,
+  selectedWeek,
+  basePath,
 }: {
-  dayId: string;
-  variations: { id: string; name: string }[];
-  activeId: string;
+  programId: string;
+  weeks: { position: number; name: string }[];
+  selectedWeek: number;
+  /** Path the tabs link to, e.g. `/workouts/<id>` or `/workouts/<id>/days/<dayId>`. */
+  basePath: string;
 }) {
   const [renaming, setRenaming] = useState(false);
-  const active = variations.find((v) => v.id === activeId);
+  const active = weeks.find((w) => w.position === selectedWeek);
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
-        {variations.map((v) => (
+        {weeks.map((w) => (
           <Link
-            key={v.id}
-            href={`/workouts/${dayId}?v=${v.id}`}
+            key={w.position}
+            href={`${basePath}?week=${w.position}`}
             className={`rounded-full border px-3 py-1.5 text-sm transition ${
-              v.id === activeId
+              w.position === selectedWeek
                 ? "border-lime-400 bg-lime-400/10 font-medium text-lime-400"
                 : "border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
             }`}
           >
-            {v.name}
+            {w.name}
           </Link>
         ))}
-        <form action={createVariation.bind(null, dayId, activeId)}>
+        <form action={addWeek.bind(null, programId, selectedWeek)}>
           <button
             className="rounded-full border border-dashed border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
-            title="Duplicate the current variation"
+            title="Copy the current week forward"
           >
-            + Variation
+            + Week
           </button>
         </form>
       </div>
@@ -45,7 +50,7 @@ export function VariationsBar({
           {renaming ? (
             <form
               action={async (fd: FormData) => {
-                await renameVariation(active.id, String(fd.get("name") ?? ""));
+                await renameWeek(programId, selectedWeek, String(fd.get("name") ?? ""));
                 setRenaming(false);
               }}
               className="flex items-center gap-2"
@@ -60,22 +65,22 @@ export function VariationsBar({
             </form>
           ) : (
             <button onClick={() => setRenaming(true)} className="transition hover:text-zinc-300">
-              Rename
+              Rename week
             </button>
           )}
-          {variations.length > 1 && (
+          {weeks.length > 1 && (
             <form
-              action={deleteVariation.bind(null, active.id)}
+              action={deleteWeek.bind(null, programId, selectedWeek)}
               onSubmit={(e) => {
                 if (
                   !confirm(
-                    `Delete variation "${active.name}" and all its logged sessions? This cannot be undone.`,
+                    `Delete "${active.name}" for every day, including its logged sessions? This cannot be undone.`,
                   )
                 )
                   e.preventDefault();
               }}
             >
-              <button className="transition hover:text-red-400">Delete</button>
+              <button className="transition hover:text-red-400">Delete week</button>
             </form>
           )}
         </div>
