@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Block, Exercise, Session, SessionNote, SetLog, Variation, Workout } from "@/db/schema";
 import { groupExercisesIntoBlocks } from "@/lib/workout";
+import { deriveWeeks, missingCells, type WeekCol } from "@/lib/weeks";
 
 export type WorkoutStructure = {
   workout: Workout;
@@ -23,6 +24,7 @@ async function dayView(dayId: string, userId: string) {
   });
   const workout: Workout = {
     id: day.id,
+    programId: program.id,
     userId: program.userId,
     name: day.name,
     defaultRestSeconds: day.defaultRestSeconds,
@@ -41,6 +43,7 @@ async function ownedDayWorkout(dayId: string, userId: string): Promise<Workout |
   if (!program) return null;
   return {
     id: day.id,
+    programId: program.id,
     userId: program.userId,
     name: day.name,
     defaultRestSeconds: day.defaultRestSeconds,
@@ -144,6 +147,7 @@ export async function listWorkouts(userId: string): Promise<WorkoutListItem[]> {
     const mine = sessions.filter((s) => s.dayId === d.id);
     return {
       id: d.id,
+      programId: program.id,
       userId: program.userId,
       name: d.name,
       defaultRestSeconds: d.defaultRestSeconds,
@@ -246,4 +250,167 @@ export async function getSessionData(
     where: eq(schema.sessionNotes.sessionId, sessionId),
   });
   return { session, structure, logs, previousLogs, notes };
+}
+
+/** Insert-only: pad any missing (day, position) cell in a program with an empty
+ * variation labelled from the week column. Idempotent; never deletes or moves. */
+async function normalizeProgram(programId: string): Promise<void> {
+  const db = await getDb();
+  const days = await db.query.days.findMany({
+    where: eq(schema.days.programId, programId),
+    orderBy: asc(schema.days.position),
+  });
+  if (!days.length) return;
+  const vars = await db.query.variations.findMany({
+    where: inArray(schema.variations.dayId, days.map((d) => d.id)),
+  });
+  const byDay = days.map((d) => vars.filter((v) => v.dayId === d.id));
+  const weeks = deriveWeeks(byDay.map((vs) => vs.map((v) => ({ position: v.position, name: v.name }))));
+  const gaps = missingCells(byDay.map((vs) => vs.map((v) => ({ position: v.position }))), weeks.length);
+  if (!gaps.length) return;
+  await db.insert(schema.variations).values(
+    gaps.map((g) => ({
+      dayId: days[g.dayIndex].id,
+      position: g.position,
+      name: weeks[g.position].name,
+    })),
+  );
+}
+
+export type ProgramListItem = {
+  id: string;
+  name: string;
+  dayCount: number;
+  lastFinishedAt: Date | null;
+  unfinishedSessionId: string | null;
+};
+
+/** One row per program (a "Workout"): day count, last finished session, any
+ * unfinished session across its days. */
+export async function listPrograms(userId: string): Promise<ProgramListItem[]> {
+  const db = await getDb();
+  const programs = await db.query.programs.findMany({
+    where: eq(schema.programs.userId, userId),
+    orderBy: asc(schema.programs.createdAt),
+  });
+  if (!programs.length) return [];
+  const days = await db.query.days.findMany({
+    where: inArray(schema.days.programId, programs.map((p) => p.id)),
+  });
+  const dayIds = days.map((d) => d.id);
+  const sessions = dayIds.length
+    ? await db.query.sessions.findMany({
+        where: inArray(schema.sessions.dayId, dayIds),
+        orderBy: desc(schema.sessions.startedAt),
+      })
+    : [];
+  return programs.map((p) => {
+    const pd = days.filter((d) => d.programId === p.id);
+    const pdIds = new Set(pd.map((d) => d.id));
+    const ps = sessions.filter((s) => pdIds.has(s.dayId));
+    return {
+      id: p.id,
+      name: p.name,
+      dayCount: pd.length,
+      lastFinishedAt: ps.find((s) => s.finishedAt)?.finishedAt ?? null,
+      unfinishedSessionId: ps.find((s) => !s.finishedAt)?.id ?? null,
+    };
+  });
+}
+
+export type HubDay = {
+  id: string;
+  name: string;
+  position: number;
+  cellVariationId: string | null;
+  exerciseCount: number;
+  sectionSummary: string;
+  unfinishedSessionId: string | null;
+};
+export type ProgramHub = {
+  program: { id: string; name: string };
+  weeks: WeekCol[];
+  selectedWeek: number;
+  days: HubDay[];
+};
+
+/** The workout hub: week columns + the days, each resolved to its cell for the
+ * selected week. `weekParam` (a position) selects the week; default is the week
+ * of the most recent session, else the last week. */
+export async function getProgramHub(
+  programId: string,
+  userId: string,
+  weekParam?: number,
+): Promise<ProgramHub | null> {
+  const db = await getDb();
+  const program = await db.query.programs.findFirst({
+    where: and(eq(schema.programs.id, programId), eq(schema.programs.userId, userId)),
+  });
+  if (!program) return null;
+  await normalizeProgram(programId);
+  const days = await db.query.days.findMany({
+    where: eq(schema.days.programId, programId),
+    orderBy: asc(schema.days.position),
+  });
+  const dayIds = days.map((d) => d.id);
+  const vars = dayIds.length
+    ? await db.query.variations.findMany({
+        where: inArray(schema.variations.dayId, dayIds),
+        orderBy: asc(schema.variations.position),
+      })
+    : [];
+  const byDay = days.map((d) => vars.filter((v) => v.dayId === d.id));
+  const weeks = deriveWeeks(byDay.map((vs) => vs.map((v) => ({ position: v.position, name: v.name }))));
+  const sessions = dayIds.length
+    ? await db.query.sessions.findMany({
+        where: inArray(schema.sessions.dayId, dayIds),
+        orderBy: desc(schema.sessions.startedAt),
+      })
+    : [];
+  let selectedWeek = weeks.length ? weeks[weeks.length - 1].position : 0;
+  if (weekParam != null && weeks.some((w) => w.position === weekParam)) {
+    selectedWeek = weekParam;
+  } else if (sessions[0]) {
+    const lv = vars.find((v) => v.id === sessions[0].variationId);
+    if (lv) selectedWeek = lv.position;
+  }
+  const cellVarByDay = new Map<string, string | null>(
+    days.map((d, i) => [d.id, byDay[i].find((v) => v.position === selectedWeek)?.id ?? null]),
+  );
+  const cellIds = [...cellVarByDay.values()].filter((x): x is string => !!x);
+  const exs = cellIds.length
+    ? await db.query.exercises.findMany({ where: inArray(schema.exercises.variationId, cellIds) })
+    : [];
+  const hubDays: HubDay[] = days.map((d) => {
+    const cid = cellVarByDay.get(d.id) ?? null;
+    const de = exs.filter((e) => e.variationId === cid);
+    const sections = [...new Set(de.map((e) => e.sectionName).filter((s): s is string => !!s))];
+    const mine = sessions.filter((s) => s.dayId === d.id);
+    return {
+      id: d.id,
+      name: d.name,
+      position: d.position,
+      cellVariationId: cid,
+      exerciseCount: de.length,
+      sectionSummary: sections.join(" · "),
+      unfinishedSessionId: mine.find((s) => !s.finishedAt)?.id ?? null,
+    };
+  });
+  return { program: { id: program.id, name: program.name }, weeks, selectedWeek, days: hubDays };
+}
+
+/** The variation id for a given (day, week position), or null. Used by the day
+ * detail and cell-edit pages. Verifies ownership. */
+export async function getDayCellVariationId(
+  dayId: string,
+  weekPos: number,
+  userId: string,
+): Promise<string | null> {
+  const owned = await ownedDayWorkout(dayId, userId);
+  if (!owned) return null;
+  const db = await getDb();
+  const v = await db.query.variations.findFirst({
+    where: and(eq(schema.variations.dayId, dayId), eq(schema.variations.position, weekPos)),
+  });
+  return v?.id ?? null;
 }

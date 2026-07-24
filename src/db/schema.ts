@@ -137,6 +137,7 @@ export type SessionNote = typeof sessionNotes.$inferSelect;
 // exercises sharing a superset_key.
 export type Workout = {
   id: string; // = day.id
+  programId: string;
   userId: string;
   name: string;
   defaultRestSeconds: number;
