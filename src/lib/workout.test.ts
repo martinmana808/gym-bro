@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  blocksToItems,
   buildSteps,
   formatClock,
   formatCurrentWeight,
@@ -10,7 +11,10 @@ import {
   formatTargetWeight,
   formatWeight,
   groupExercisesIntoBlocks,
+  itemsToBlocks,
   numberOptions,
+  type BuilderBlock,
+  type BuilderDivider,
   type LoggedSet,
   type RunnerExercise,
 } from "./workout";
@@ -217,6 +221,53 @@ describe("groupExercisesIntoBlocks", () => {
 
   it("returns [] for empty input", () => {
     expect(groupExercisesIntoBlocks([])).toEqual([]);
+  });
+});
+
+describe("itemsToBlocks", () => {
+  const D = (name: string): BuilderDivider => ({ kind: "divider", key: `d-${name}`, name });
+  const B = (sets: number, ...ex: { id: string }[]): BuilderBlock<{ id: string }> =>
+    ({ kind: "block", key: `b-${ex[0]?.id}`, sets, exercises: ex });
+
+  it("assigns each block the current divider's section and the block's sets", () => {
+    const out = itemsToBlocks([
+      D("Biceps"), B(4, { id: "a" }, { id: "b" }),
+      D("Back"), B(3, { id: "c" }),
+    ]);
+    expect(out).toEqual([
+      { id: undefined, sectionName: "Biceps", exercises: [{ id: "a", sets: 4 }, { id: "b", sets: 4 }] },
+      { id: undefined, sectionName: "Back", exercises: [{ id: "c", sets: 3 }] },
+    ]);
+  });
+  it("leaves blocks before the first divider un-sectioned, and blank dividers => null", () => {
+    const out = itemsToBlocks([B(2, { id: "x" }), D("  "), B(2, { id: "y" })]);
+    expect(out.map((b) => b.sectionName)).toEqual([null, null]);
+  });
+});
+
+describe("blocksToItems", () => {
+  let n = 0;
+  const key = () => `k${n++}`;
+  const ex = (id: string, sectionName: string | null, sets: number) => ({ id, sectionName, sets });
+
+  it("inserts a divider when the section changes to a new non-null value", () => {
+    n = 0;
+    const items = blocksToItems(
+      [
+        { id: "b1", exercises: [ex("a", "Biceps", 4), ex("b", "Biceps", 4)] },
+        { id: "b2", exercises: [ex("c", "Back", 3)] },
+      ],
+      key,
+    );
+    expect(items.map((i) => (i.kind === "divider" ? `DIV:${i.name}` : `BLK:${i.sets}`))).toEqual([
+      "DIV:Biceps", "BLK:4", "DIV:Back", "BLK:3",
+    ]);
+  });
+  it("uses the max sets of a block and no divider for a leading null section", () => {
+    n = 0;
+    const items = blocksToItems([{ id: "b1", exercises: [ex("a", null, 2), ex("b", null, 4)] }], key);
+    expect(items).toHaveLength(1);
+    expect(items[0]).toMatchObject({ kind: "block", sets: 4 });
   });
 });
 

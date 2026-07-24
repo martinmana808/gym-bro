@@ -197,6 +197,49 @@ function trimNumber(n: number): string {
   return Number.isInteger(n) ? `${n}` : `${n}`.replace(/(\.\d\d).*$/, "$1");
 }
 
+export type BuilderDivider = { kind: "divider"; key: string; name: string };
+export type BuilderBlock<E> = { kind: "block"; key: string; id?: string; sets: number; exercises: E[] };
+export type BuilderItem<E> = BuilderDivider | BuilderBlock<E>;
+
+/** Flatten builder items into blocks: each block's exercises inherit the block's
+ * sets and the most-recent divider's (trimmed, else null) section name. */
+export function itemsToBlocks<E>(
+  items: BuilderItem<E>[],
+): { id?: string; sectionName: string | null; exercises: (E & { sets: number })[] }[] {
+  const blocks: { id?: string; sectionName: string | null; exercises: (E & { sets: number })[] }[] = [];
+  let section: string | null = null;
+  for (const it of items) {
+    if (it.kind === "divider") {
+      section = it.name.trim() || null;
+      continue;
+    }
+    blocks.push({
+      id: it.id,
+      sectionName: section,
+      exercises: it.exercises.map((e) => ({ ...e, sets: it.sets })),
+    });
+  }
+  return blocks;
+}
+
+/** Rebuild builder items from stored blocks: insert a divider when the section
+ * changes to a new non-null value; a block's sets = the max of its exercises'. */
+export function blocksToItems<E extends { sectionName: string | null; sets: number }>(
+  blocks: { id?: string; exercises: E[] }[],
+  makeKey: () => string,
+): BuilderItem<E>[] {
+  const items: BuilderItem<E>[] = [];
+  let prev: string | null = null;
+  for (const b of blocks) {
+    const section = b.exercises[0]?.sectionName ?? null;
+    if (section && section !== prev) items.push({ kind: "divider", key: makeKey(), name: section });
+    prev = section;
+    const sets = Math.max(1, ...b.exercises.map((e) => e.sets));
+    items.push({ kind: "block", key: makeKey(), id: b.id, sets, exercises: b.exercises });
+  }
+  return items;
+}
+
 export function blockLabel(size: number): string {
   return size === 3 ? "Triset" : size === 2 ? "Superset" : "Exercise";
 }
