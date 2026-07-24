@@ -43,9 +43,11 @@ const field =
 export function WorkoutBuilder({
   variationId,
   initial,
+  nameLabel = "Workout name",
 }: {
   variationId?: string;
   initial?: { name: string; defaultRestSeconds: number; blocks: BlockInput[] };
+  nameLabel?: string;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
   const [rest, setRest] = useState(initial?.defaultRestSeconds ?? 90);
@@ -126,7 +128,7 @@ export function WorkoutBuilder({
   return (
     <div className="flex flex-col gap-5 pb-28">
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm text-zinc-400">Workout name</span>
+        <span className="text-sm text-zinc-400">{nameLabel}</span>
         <input
           className={field}
           value={name}

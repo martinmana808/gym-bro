@@ -123,7 +123,7 @@ export async function createWorkout(input: WorkoutInput) {
     programId = program.id;
     const [day] = await tx
       .insert(schema.days)
-      .values({ programId: program.id, position: 0, name: data.name, defaultRestSeconds: data.defaultRestSeconds })
+      .values({ programId: program.id, position: 0, name: "Day 1", defaultRestSeconds: data.defaultRestSeconds })
       .returning({ id: schema.days.id });
     const [variation] = await tx
       .insert(schema.variations)

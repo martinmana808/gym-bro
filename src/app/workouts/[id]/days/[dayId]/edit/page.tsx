@@ -59,6 +59,7 @@ export default async function EditCellPage({
 
       <WorkoutBuilder
         variationId={cellVariationId}
+        nameLabel="Day name"
         initial={{
           name: workout.name,
           defaultRestSeconds: workout.defaultRestSeconds,
