@@ -334,7 +334,8 @@ export type HubDay = {
   exerciseCount: number;
   sectionSummary: string;
   unfinishedSessionId: string | null;
-  lastFinishedAt: Date | null;
+  /** Preformatted on the server (client component would mismatch on hydration). */
+  lastDoneLabel: string | null;
 };
 export type ProgramHub = {
   program: { id: string; name: string };
@@ -408,7 +409,10 @@ export async function getProgramHub(
       exerciseCount: de.length,
       sectionSummary: sections.join(" · "),
       unfinishedSessionId: mine.find((s) => !s.finishedAt)?.id ?? null,
-      lastFinishedAt: finished.find((s) => s.dayId === d.id)?.finishedAt ?? null,
+      lastDoneLabel:
+        finished
+          .find((s) => s.dayId === d.id)
+          ?.finishedAt?.toLocaleDateString(undefined, { month: "short", day: "numeric" }) ?? null,
     };
   });
   return {

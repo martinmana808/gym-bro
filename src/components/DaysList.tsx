@@ -52,9 +52,7 @@ function DayRow({
 }) {
   const [renaming, setRenaming] = useState(false);
   const dayHref = `/workouts/${programId}/days/${day.id}?week=${selectedWeek}`;
-  const lastDone = day.lastFinishedAt
-    ? day.lastFinishedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })
-    : null;
+  const lastDone = day.lastDoneLabel;
   return (
     <div
       className={`rounded-2xl border p-4 ${
