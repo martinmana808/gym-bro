@@ -5,6 +5,7 @@ import { getProgramHub } from "@/db/queries";
 import { deleteProgram } from "@/app/actions";
 import { WeekTabs } from "@/components/WeekTabs";
 import { DaysList } from "@/components/DaysList";
+import { HubActions } from "@/components/HubActions";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +42,15 @@ export default async function WorkoutHubPage({
           </p>
         </div>
       </header>
+
+      <HubActions programId={hub.program.id} name={hub.program.name} />
+
+      <Link
+        href={`/workouts/${hub.program.id}/sheet`}
+        className="text-center text-sm text-zinc-400 underline underline-offset-2 transition hover:text-lime-400"
+      >
+        📊 Spreadsheet view — all weeks &amp; sessions
+      </Link>
 
       <WeekTabs
         programId={hub.program.id}

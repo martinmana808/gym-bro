@@ -618,3 +618,104 @@ export async function deleteWeek(programId: string, weekPos: number) {
   revalidatePath(`/workouts/${programId}`);
   redirect(`/workouts/${programId}`);
 }
+
+export async function renameProgram(programId: string, name: string) {
+  const userId = await requireUserId();
+  await ownedProgram(programId, userId);
+  const db = await getDb();
+  await db
+    .update(schema.programs)
+    .set({ name: name.trim().slice(0, 80) || "Workout" })
+    .where(eq(schema.programs.id, programId));
+  revalidatePath("/workouts");
+  revalidatePath(`/workouts/${programId}`);
+}
+
+/** Clone a program's PLAN (days, weeks, exercises) into a new program. Does not
+ * copy sessions/logs. Lineage + superset grouping are preserved within the copy
+ * via consistent old→new id maps. */
+export async function duplicateProgram(programId: string) {
+  const userId = await requireUserId();
+  const source = await ownedProgram(programId, userId);
+  const db = await getDb();
+  const days = await db.query.days.findMany({
+    where: eq(schema.days.programId, programId),
+    orderBy: asc(schema.days.position),
+  });
+  const vars = days.length
+    ? await db.query.variations.findMany({
+        where: inArray(schema.variations.dayId, days.map((d) => d.id)),
+      })
+    : [];
+  const exercises = vars.length
+    ? await db.query.exercises.findMany({
+        where: inArray(schema.exercises.variationId, vars.map((v) => v.id)),
+      })
+    : [];
+  const lineageMap = new Map<string, string>();
+  const supersetMap = new Map<string, string>();
+  const mapId = (m: Map<string, string>, k: string | null) => {
+    if (k == null) return null;
+    let v = m.get(k);
+    if (!v) {
+      v = crypto.randomUUID();
+      m.set(k, v);
+    }
+    return v;
+  };
+  let newProgramId = "";
+  await db.transaction(async (tx) => {
+    const [program] = await tx
+      .insert(schema.programs)
+      .values({ userId, name: `${source.name} copy`.slice(0, 80) })
+      .returning({ id: schema.programs.id });
+    newProgramId = program.id;
+    for (const d of days) {
+      const [nd] = await tx
+        .insert(schema.days)
+        .values({
+          programId: program.id,
+          position: d.position,
+          name: d.name,
+          defaultRestSeconds: d.defaultRestSeconds,
+        })
+        .returning({ id: schema.days.id });
+      const dayVars = vars
+        .filter((v) => v.dayId === d.id)
+        .sort((a, b) => a.position - b.position);
+      for (const v of dayVars) {
+        const [nv] = await tx
+          .insert(schema.variations)
+          .values({ dayId: nd.id, position: v.position, name: v.name })
+          .returning({ id: schema.variations.id });
+        const vExs = exercises
+          .filter((e) => e.variationId === v.id)
+          .sort((a, b) => a.position - b.position);
+        if (vExs.length) {
+          await tx.insert(schema.exercises).values(
+            vExs.map((e) => ({
+              variationId: nv.id,
+              position: e.position,
+              lineageId: mapId(lineageMap, e.lineageId)!,
+              sectionName: e.sectionName,
+              supersetKey: mapId(supersetMap, e.supersetKey),
+              name: e.name,
+              sets: e.sets,
+              measurement: e.measurement,
+              repScheme: e.repScheme,
+              repsMin: e.repsMin,
+              repsMax: e.repsMax,
+              timeSeconds: e.timeSeconds,
+              restOverrideSeconds: e.restOverrideSeconds,
+              note: e.note,
+              weightUnit: e.weightUnit,
+              targetWeight: e.targetWeight,
+            })),
+          );
+        }
+      }
+    }
+  });
+  revalidatePath("/workouts");
+  redirect(`/workouts/${newProgramId}`);
+}
