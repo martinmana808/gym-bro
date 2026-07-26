@@ -49,7 +49,7 @@ export default async function DayDetailPage({
   if (!cellVariationId) notFound();
   const [structure, history, unfinished] = await Promise.all([
     getVariationStructure(cellVariationId, userId),
-    getWorkoutHistory(dayId),
+    getWorkoutHistory(dayId, cellVariationId),
     getUnfinishedSession(dayId, userId),
   ]);
   if (!structure) notFound();

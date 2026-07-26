@@ -166,10 +166,18 @@ export type WorkoutHistory = {
   variationNameBySession: Record<string, string>;
 };
 
-export async function getWorkoutHistory(dayId: string, limit = 6): Promise<WorkoutHistory> {
+export async function getWorkoutHistory(
+  dayId: string,
+  variationId?: string,
+  limit = 6,
+): Promise<WorkoutHistory> {
   const db = await getDb();
+  // Scope to one week's cell when given, so older weeks aren't truncated by the
+  // limit before the per-week filter (a day spans many weeks now).
   const sessions = await db.query.sessions.findMany({
-    where: eq(schema.sessions.dayId, dayId),
+    where: variationId
+      ? and(eq(schema.sessions.dayId, dayId), eq(schema.sessions.variationId, variationId))
+      : eq(schema.sessions.dayId, dayId),
     orderBy: desc(schema.sessions.startedAt),
   });
   const finished = sessions.filter((s) => s.finishedAt).slice(0, limit);
