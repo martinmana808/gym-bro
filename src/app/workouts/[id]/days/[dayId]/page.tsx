@@ -133,7 +133,7 @@ export default async function DayDetailPage({
             return (
               <div key={block.id} className="flex flex-col gap-1">
                 {showHeader && (
-                  <p className="mt-2 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-400">
+                  <p className="mt-2 border-l-2 border-lime-400 pl-2 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
                     {section}
                   </p>
                 )}
@@ -208,7 +208,7 @@ export default async function DayDetailPage({
                         <tr className="border-b border-zinc-800/60 bg-zinc-900/40">
                           <td
                             colSpan={3 + columns.length}
-                            className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-zinc-400"
+                            className="border-l-2 border-lime-400 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-lime-400"
                           >
                             {section}
                           </td>

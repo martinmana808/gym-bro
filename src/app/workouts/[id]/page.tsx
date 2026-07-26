@@ -49,7 +49,12 @@ export default async function WorkoutHubPage({
         basePath={`/workouts/${hub.program.id}`}
       />
 
-      <DaysList programId={hub.program.id} selectedWeek={hub.selectedWeek} days={hub.days} />
+      <DaysList
+        programId={hub.program.id}
+        selectedWeek={hub.selectedWeek}
+        days={hub.days}
+        lastDoneDayId={hub.lastDoneDayId}
+      />
 
       <form action={deleteProgram.bind(null, hub.program.id)} className="mt-4 text-center">
         <ConfirmSubmit

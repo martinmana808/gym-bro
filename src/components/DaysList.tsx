@@ -12,15 +12,23 @@ export function DaysList({
   programId,
   selectedWeek,
   days,
+  lastDoneDayId,
 }: {
   programId: string;
   selectedWeek: number;
   days: HubDay[];
+  lastDoneDayId: string | null;
 }) {
   return (
     <div className="flex flex-col gap-3">
       {days.map((d) => (
-        <DayRow key={d.id} programId={programId} selectedWeek={selectedWeek} day={d} />
+        <DayRow
+          key={d.id}
+          programId={programId}
+          selectedWeek={selectedWeek}
+          day={d}
+          isLastDone={d.id === lastDoneDayId}
+        />
       ))}
       <form action={addDay.bind(null, programId)}>
         <button className="w-full rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400">
@@ -35,15 +43,24 @@ function DayRow({
   programId,
   selectedWeek,
   day,
+  isLastDone,
 }: {
   programId: string;
   selectedWeek: number;
   day: HubDay;
+  isLastDone: boolean;
 }) {
   const [renaming, setRenaming] = useState(false);
   const dayHref = `/workouts/${programId}/days/${day.id}?week=${selectedWeek}`;
+  const lastDone = day.lastFinishedAt
+    ? day.lastFinishedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })
+    : null;
   return (
-    <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4">
+    <div
+      className={`rounded-2xl border p-4 ${
+        isLastDone ? "border-lime-400/60 bg-lime-400/[0.04]" : "border-zinc-800/80 bg-zinc-900/60"
+      }`}
+    >
       {renaming ? (
         <form
           action={async (fd: FormData) => {
@@ -62,10 +79,20 @@ function DayRow({
         </form>
       ) : (
         <Link href={dayHref} className="block">
-          <h3 className="text-lg font-semibold tracking-tight">{day.name}</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold tracking-tight">{day.name}</h3>
+            {isLastDone && (
+              <span className="rounded-full bg-lime-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-400">
+                Last done
+              </span>
+            )}
+          </div>
           <p className="mt-0.5 text-sm text-zinc-400">
             {day.exerciseCount} exercise{day.exerciseCount === 1 ? "" : "s"}
             {day.sectionSummary && ` · ${day.sectionSummary}`}
+          </p>
+          <p className="mt-0.5 text-xs text-zinc-500">
+            {lastDone ? `Last done ${lastDone}` : "Not done yet"}
           </p>
         </Link>
       )}

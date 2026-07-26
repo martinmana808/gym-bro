@@ -73,6 +73,7 @@ export function SessionRunner({
     return i === -1 ? Math.max(0, setSteps.length - 1) : i;
   });
   const [resting, setResting] = useState<{ endsAt: number; total: number } | null>(null);
+  const [justDid, setJustDid] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
@@ -153,6 +154,7 @@ export function SessionRunner({
     const flatIndex = steps.indexOf(step);
     const next = steps[flatIndex + 1];
     if (next?.kind === "rest") {
+      setJustDid(`${step.exercise.name} · ${formatLoggedSet(entry, step.exercise.weightUnit)}`);
       setResting({ endsAt: Date.now() + next.seconds * 1000, total: next.seconds });
     }
     if (setIndex < setSteps.length - 1) setSetIndex(setIndex + 1);
@@ -233,6 +235,7 @@ export function SessionRunner({
           onExtend={() => setResting((r) => r && { ...r, endsAt: r.endsAt + 30_000 })}
           onSkip={() => setResting(null)}
           nextUp={step ? step.exercise.name : null}
+          justDid={justDid}
         />
       ) : done ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
@@ -468,17 +471,24 @@ function RestScreen({
   onExtend,
   onSkip,
   nextUp,
+  justDid,
 }: {
   remaining: number;
   total: number;
   onExtend: () => void;
   onSkip: () => void;
   nextUp: string | null;
+  justDid: string | null;
 }) {
   const pct = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
   return (
     <div className="flex flex-1 flex-col items-center justify-center gap-6 text-center">
       <p className="text-xs font-semibold uppercase tracking-[0.25em] text-sky-400">Rest</p>
+      {justDid && (
+        <p className="-mb-2 text-sm text-zinc-400">
+          Just did <span className="font-semibold text-lime-400">{justDid}</span>
+        </p>
+      )}
       <div
         className="grid size-52 place-items-center rounded-full"
         style={{

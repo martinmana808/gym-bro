@@ -334,12 +334,15 @@ export type HubDay = {
   exerciseCount: number;
   sectionSummary: string;
   unfinishedSessionId: string | null;
+  lastFinishedAt: Date | null;
 };
 export type ProgramHub = {
   program: { id: string; name: string };
   weeks: WeekCol[];
   selectedWeek: number;
   days: HubDay[];
+  /** The day of the most recent finished session — highlighted in the hub. */
+  lastDoneDayId: string | null;
 };
 
 /** The workout hub: week columns + the days, each resolved to its cell for the
@@ -375,13 +378,16 @@ export async function getProgramHub(
         orderBy: desc(schema.sessions.startedAt),
       })
     : [];
+  const finished = sessions.filter((s) => s.finishedAt);
+  const anchor = finished[0] ?? sessions[0]; // last session I did → default week
   let selectedWeek = weeks.length ? weeks[weeks.length - 1].position : 0;
   if (weekParam != null && weeks.some((w) => w.position === weekParam)) {
     selectedWeek = weekParam;
-  } else if (sessions[0]) {
-    const lv = vars.find((v) => v.id === sessions[0].variationId);
+  } else if (anchor) {
+    const lv = vars.find((v) => v.id === anchor.variationId);
     if (lv) selectedWeek = lv.position;
   }
+  const lastDoneDayId = finished[0]?.dayId ?? null;
   const cellVarByDay = new Map<string, string | null>(
     days.map((d, i) => [d.id, byDay[i].find((v) => v.position === selectedWeek)?.id ?? null]),
   );
@@ -402,9 +408,16 @@ export async function getProgramHub(
       exerciseCount: de.length,
       sectionSummary: sections.join(" · "),
       unfinishedSessionId: mine.find((s) => !s.finishedAt)?.id ?? null,
+      lastFinishedAt: finished.find((s) => s.dayId === d.id)?.finishedAt ?? null,
     };
   });
-  return { program: { id: program.id, name: program.name }, weeks, selectedWeek, days: hubDays };
+  return {
+    program: { id: program.id, name: program.name },
+    weeks,
+    selectedWeek,
+    days: hubDays,
+    lastDoneDayId,
+  };
 }
 
 /** The variation id for a given (day, week position), or null. Used by the day
