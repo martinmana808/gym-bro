@@ -1,8 +1,14 @@
 import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Block, Exercise, Session, SessionNote, SetLog, Variation, Workout } from "@/db/schema";
-import { groupExercisesIntoBlocks } from "@/lib/workout";
+import {
+  formatSessionCell,
+  formatTarget,
+  formatTargetWeight,
+  groupExercisesIntoBlocks,
+} from "@/lib/workout";
 import { deriveWeeks, missingCells, type WeekCol } from "@/lib/weeks";
+import { buildSheetRows, type SheetRow, type SheetWeekMeta } from "@/lib/sheet";
 
 export type WorkoutStructure = {
   workout: Workout;
@@ -438,4 +444,94 @@ export async function getDayCellVariationId(
     where: and(eq(schema.variations.dayId, dayId), eq(schema.variations.position, weekPos)),
   });
   return v?.id ?? null;
+}
+
+export type ProgramSheetDay = { id: string; name: string; weeks: SheetWeekMeta[]; rows: SheetRow[] };
+export type ProgramSheet = { program: { id: string; name: string }; days: ProgramSheetDay[] };
+
+/** The whole workout as a spreadsheet: per day, weeks as column groups (Target +
+ * a column per finished session), exercises aligned across weeks as rows. */
+export async function getProgramSheet(
+  programId: string,
+  userId: string,
+): Promise<ProgramSheet | null> {
+  const db = await getDb();
+  const program = await db.query.programs.findFirst({
+    where: and(eq(schema.programs.id, programId), eq(schema.programs.userId, userId)),
+  });
+  if (!program) return null;
+  const days = await db.query.days.findMany({
+    where: eq(schema.days.programId, programId),
+    orderBy: asc(schema.days.position),
+  });
+  const dayIds = days.map((d) => d.id);
+  const vars = dayIds.length
+    ? await db.query.variations.findMany({
+        where: inArray(schema.variations.dayId, dayIds),
+        orderBy: asc(schema.variations.position),
+      })
+    : [];
+  const varIds = vars.map((v) => v.id);
+  const exercises = varIds.length
+    ? await db.query.exercises.findMany({
+        where: inArray(schema.exercises.variationId, varIds),
+        orderBy: asc(schema.exercises.position),
+      })
+    : [];
+  const sessions = dayIds.length
+    ? await db.query.sessions.findMany({
+        where: inArray(schema.sessions.dayId, dayIds),
+        orderBy: asc(schema.sessions.startedAt),
+      })
+    : [];
+  const finished = sessions.filter((s) => s.finishedAt);
+  const logs = finished.length
+    ? await db.query.setLogs.findMany({
+        where: inArray(
+          schema.setLogs.sessionId,
+          finished.map((s) => s.id),
+        ),
+        orderBy: asc(schema.setLogs.setNumber),
+      })
+    : [];
+  const exById = new Map(exercises.map((e) => [e.id, e]));
+
+  const outDays: ProgramSheetDay[] = days.map((day) => {
+    const dayVars = vars.filter((v) => v.dayId === day.id);
+    const weekMetas: SheetWeekMeta[] = dayVars.map((v) => {
+      const vSessions = finished.filter((s) => s.variationId === v.id);
+      return {
+        position: v.position,
+        name: v.name,
+        sessions: vSessions.map((s) => ({
+          id: s.id,
+          label: s.startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" }),
+        })),
+      };
+    });
+    const weeksForRows = dayVars.map((v) => ({
+      exercises: exercises
+        .filter((e) => e.variationId === v.id)
+        .map((e) => ({
+          id: e.id,
+          lineageId: e.lineageId,
+          name: e.name,
+          sectionName: e.sectionName,
+          weightUnit: e.weightUnit,
+        })),
+    }));
+    const cell = (exId: string, weekIndex: number) => {
+      const e = exById.get(exId)!;
+      const target = formatTarget(e) + (e.targetWeight != null ? ` · ${formatTargetWeight(e)}` : "");
+      const meta = weekMetas[weekIndex];
+      const sessionStrings = meta.sessions.map((s) => {
+        const cellLogs = logs.filter((l) => l.sessionId === s.id && l.exerciseId === exId);
+        return formatSessionCell(cellLogs, e.weightUnit, null);
+      });
+      return { target, sessions: sessionStrings };
+    };
+    const rows = buildSheetRows(weeksForRows, cell);
+    return { id: day.id, name: day.name, weeks: weekMetas, rows };
+  });
+  return { program: { id: program.id, name: program.name }, days: outDays };
 }
