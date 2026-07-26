@@ -363,24 +363,32 @@ export async function deleteSession(sessionId: string) {
   redirect(`/workouts/${day!.programId}/days/${session.dayId}`);
 }
 
-export type ImportProgramExercise = {
-  name: string;
-  sets: number;
+export type ImportWeekTarget = {
+  targetWeight: number | null;
   weightUnit: WeightUnit;
   repScheme: RepScheme;
   repsMin: number | null;
   repsMax: number | null;
-  targetWeight: number | null;
-  supersetGroup: string | null;
-  sectionName: string | null;
-  note: string | null;
 };
-export type ImportProgramDay = { name: string; exercises: ImportProgramExercise[] };
+export type ImportWeeksExercise = {
+  name: string;
+  sets: number;
+  sectionName: string | null;
+  perWeek: ImportWeekTarget[];
+};
+export type ImportWeeksDay = { name: string; exercises: ImportWeeksExercise[] };
 
-export async function importProgram(programName: string, days: ImportProgramDay[]) {
+/** Import a weeks-as-columns program: Program → Days → Weeks (aligned) → a cell
+ * per (day, week) whose exercises carry that week's target. Each exercise keeps
+ * one lineage across its weeks; no supersets are inferred (each is its own block). */
+export async function importWeeksProgram(
+  programName: string,
+  weekNames: string[],
+  days: ImportWeeksDay[],
+) {
   const userId = await requireUserId();
-  // Nothing to import (e.g. a direct call with an empty parse) — don't create an orphan program.
   if (!days.some((d) => d.exercises.some((e) => e.name.trim()))) redirect("/import");
+  const weeks = weekNames.length ? weekNames : ["Week 1"];
   const db = await getDb();
   let programId = "";
   await db.transaction(async (tx) => {
@@ -392,41 +400,44 @@ export async function importProgram(programName: string, days: ImportProgramDay[
     for (const [di, d] of days.entries()) {
       const [day] = await tx
         .insert(schema.days)
-        .values({ programId: program.id, position: di, name: d.name.trim().slice(0, 80) || `Day ${di + 1}`, defaultRestSeconds: 90 })
+        .values({
+          programId: program.id,
+          position: di,
+          name: d.name.trim().slice(0, 80) || `Day ${di + 1}`,
+          defaultRestSeconds: 90,
+        })
         .returning({ id: schema.days.id });
-      const [variation] = await tx
-        .insert(schema.variations)
-        .values({ dayId: day.id, position: 0, name: "Week 1" })
-        .returning({ id: schema.variations.id });
-      let prevGroup: string | null = null;
-      let key = crypto.randomUUID();
-      const rows = d.exercises
-        .filter((e) => e.name.trim())
-        .map((e, i) => {
-          const sameBlock = i > 0 && e.supersetGroup != null && e.supersetGroup === prevGroup;
-          if (!sameBlock) key = crypto.randomUUID();
-          prevGroup = e.supersetGroup;
+      const exercises = d.exercises.filter((e) => e.name.trim());
+      const lineages = exercises.map(() => crypto.randomUUID());
+      for (const [wi, weekName] of weeks.entries()) {
+        const [variation] = await tx
+          .insert(schema.variations)
+          .values({ dayId: day.id, position: wi, name: weekName.trim().slice(0, 60) || `Week ${wi + 1}` })
+          .returning({ id: schema.variations.id });
+        const rows = exercises.map((e, i) => {
+          const t = e.perWeek[wi] ?? e.perWeek[e.perWeek.length - 1];
           const sets = Math.min(20, Math.max(1, Math.round(e.sets) || 1));
           return {
             variationId: variation.id,
             position: i,
-            lineageId: crypto.randomUUID(),
+            lineageId: lineages[i],
             sectionName: e.sectionName?.trim().slice(0, 40) || null,
-            supersetKey: key,
+            supersetKey: crypto.randomUUID(),
             name: e.name.trim().slice(0, 120),
             sets,
             measurement: "reps" as const,
-            repScheme: e.repScheme,
-            repsMin: e.repScheme === "failure" ? null : Math.min(999, Math.max(1, Math.round(e.repsMin ?? 10))),
-            repsMax: e.repScheme === "range" ? Math.min(999, Math.max(1, Math.round(e.repsMax ?? 15))) : null,
+            repScheme: t?.repScheme ?? "fixed",
+            repsMin: t?.repScheme === "failure" ? null : Math.min(999, Math.max(1, Math.round(t?.repsMin ?? 10))),
+            repsMax: t?.repScheme === "range" ? Math.min(999, Math.max(1, Math.round(t?.repsMax ?? 15))) : null,
             timeSeconds: null,
             restOverrideSeconds: null,
-            note: e.note?.trim().slice(0, 500) || null,
-            weightUnit: e.weightUnit === "bricks" ? ("bricks" as const) : ("kg" as const),
-            targetWeight: e.targetWeight == null ? null : Math.max(0, e.targetWeight),
+            note: null,
+            weightUnit: t?.weightUnit === "bricks" ? ("bricks" as const) : ("kg" as const),
+            targetWeight: t?.targetWeight == null ? null : Math.max(0, t.targetWeight),
           };
         });
-      if (rows.length) await tx.insert(schema.exercises).values(rows);
+        if (rows.length) await tx.insert(schema.exercises).values(rows);
+      }
     }
   });
   revalidatePath("/workouts");

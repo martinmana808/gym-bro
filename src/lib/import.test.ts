@@ -1,48 +1,73 @@
-import { describe, expect, it } from "vitest";
-import { parseWorkoutCsv } from "./import";
+import { describe, it, expect } from "vitest";
+import { parseTargetCell, parseWeeksCsv } from "./import";
 
-describe("parseWorkoutCsv", () => {
-  const CSV = [
-    "Day: Push",
-    "Section: Chest",
-    "Bench press,4,kg,fixed,8,60,,",
-    "Incline dumbbell,4,kg,range,8-12,22.5,,",
-    "Section: Triceps",
-    "Pushdown,3,bricks,fixed,12,20,supA,",
-    "Overhead ext,3,kg,fixed,12,15,supA,felt strong",
-    "Day: Pull",
-    "Section: Back",
-    "Pull-up,3,bricks,failure,,,,",
+describe("parseTargetCell", () => {
+  it("parses weight x reps in kg", () => {
+    expect(parseTargetCell("40kg x 8")).toMatchObject({
+      targetWeight: 40,
+      weightUnit: "kg",
+      repScheme: "fixed",
+      repsMin: 8,
+    });
+  });
+  it("parses bricks and a rep range", () => {
+    expect(parseTargetCell("10bricks x 8-12")).toMatchObject({
+      targetWeight: 10,
+      weightUnit: "bricks",
+      repScheme: "range",
+      repsMin: 8,
+      repsMax: 12,
+    });
+  });
+  it("parses bodyweight to failure (no weight)", () => {
+    expect(parseTargetCell("bodyweight x failure")).toMatchObject({
+      targetWeight: null,
+      repScheme: "failure",
+      repsMin: null,
+    });
+  });
+  it("defaults reps to 10 when only a weight is given, and empty cell to a blank target", () => {
+    expect(parseTargetCell("50")).toMatchObject({ targetWeight: 50, repScheme: "fixed", repsMin: 10 });
+    expect(parseTargetCell("")).toMatchObject({ targetWeight: null, repScheme: "fixed" });
+  });
+});
+
+describe("parseWeeksCsv", () => {
+  const csv = [
+    "Program,My Split",
+    "Day 1,Sets,Week 1,Week 2",
+    "# Chest",
+    "Bench press,4,40kg x 8,45kg x 6",
+    "Day 2,Sets,Week 1,Week 2",
+    "# Back",
+    "Pull-up,3,bodyweight x failure,bodyweight x failure",
   ].join("\n");
 
-  it("parses days, sections, schemes, units, targets, supersets, notes", () => {
-    const { days, warnings } = parseWorkoutCsv(CSV);
-    expect(warnings).toEqual([]);
-    expect(days.map((d) => d.name)).toEqual(["Push", "Pull"]);
-    const push = days[0].exercises;
-    expect(push).toHaveLength(4);
-    expect(push[0]).toMatchObject({
-      name: "Bench press", sets: 4, weightUnit: "kg", repScheme: "fixed",
-      repsMin: 8, repsMax: null, targetWeight: 60, sectionName: "Chest",
-      supersetGroup: null, note: null,
-    });
-    expect(push[1]).toMatchObject({ repScheme: "range", repsMin: 8, repsMax: 12, targetWeight: 22.5 });
-    expect(push[2]).toMatchObject({ weightUnit: "bricks", sectionName: "Triceps", supersetGroup: "supA" });
-    expect(push[3]).toMatchObject({ supersetGroup: "supA", note: "felt strong" });
-    const pull = days[1].exercises;
-    expect(pull[0]).toMatchObject({
-      repScheme: "failure", repsMin: null, repsMax: null, targetWeight: null,
-      weightUnit: "bricks", sectionName: "Back",
-    });
+  it("reads the program name and week columns", () => {
+    const r = parseWeeksCsv(csv);
+    expect(r.programName).toBe("My Split");
+    expect(r.weekNames).toEqual(["Week 1", "Week 2"]);
+    expect(r.days.map((d) => d.name)).toEqual(["Day 1", "Day 2"]);
   });
 
-  it("warns on an exercise row before any Day and on an empty file", () => {
-    expect(parseWorkoutCsv("Bench,4,kg,fixed,8,60,,").warnings.length).toBeGreaterThan(0);
-    expect(parseWorkoutCsv("").warnings.length).toBeGreaterThan(0);
+  it("attaches sections and a per-week target to each exercise", () => {
+    const r = parseWeeksCsv(csv);
+    const bench = r.days[0].exercises[0];
+    expect(bench).toMatchObject({ name: "Bench press", sets: 4, sectionName: "Chest" });
+    expect(bench.perWeek).toHaveLength(2);
+    expect(bench.perWeek[0]).toMatchObject({ targetWeight: 40, repsMin: 8 });
+    expect(bench.perWeek[1]).toMatchObject({ targetWeight: 45, repsMin: 6 });
   });
 
-  it("falls back to fixed when a range cell has no min-max", () => {
-    const { days } = parseWorkoutCsv("Day: D\nBench,3,kg,range,10,50,,");
-    expect(days[0].exercises[0]).toMatchObject({ repScheme: "fixed", repsMin: 10 });
+  it("pads exercises with fewer cells to the program's week count", () => {
+    const r = parseWeeksCsv("Day 1,Sets,Week 1,Week 2,Week 3\nSquat,5,60kg x 5");
+    expect(r.weekNames).toHaveLength(3);
+    expect(r.days[0].exercises[0].perWeek).toHaveLength(3);
+  });
+
+  it("warns when there is no day header", () => {
+    const r = parseWeeksCsv("just,some,text");
+    expect(r.days).toHaveLength(0);
+    expect(r.warnings.length).toBeGreaterThan(0);
   });
 });
