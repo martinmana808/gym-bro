@@ -12,6 +12,42 @@ export type SheetWeekMeta = { position: number; name: string; sessions: { id: st
  * week's exercises in order; `cell(exId, weekIndex)` renders that exercise's cell
  * for the week. Rows are keyed by lineageId (falling back to name when lineages
  * differ); row order = first appearance scanning weeks in order. */
+function csvEsc(v: string): string {
+  return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+}
+
+/** Serialize the whole workout to a spreadsheet CSV mirroring the on-screen
+ * table: a block per day, with a header row of "<Week> · Target" + session date
+ * columns, muscle-section rows, then one row per exercise across the weeks. */
+export function programSheetToCsv(
+  programName: string,
+  days: { name: string; weeks: SheetWeekMeta[]; rows: SheetRow[] }[],
+): string {
+  const lines: string[] = [csvEsc(programName)];
+  for (const day of days) {
+    lines.push("");
+    lines.push(csvEsc(day.name));
+    const header = ["Exercise"];
+    for (const w of day.weeks) {
+      header.push(`${w.name} · Target`);
+      for (const s of w.sessions) header.push(s.label);
+    }
+    lines.push(header.map(csvEsc).join(","));
+    let prevSection: string | null = null;
+    for (const row of day.rows) {
+      if (row.sectionName && row.sectionName !== prevSection) lines.push(csvEsc(row.sectionName));
+      prevSection = row.sectionName;
+      const cells = [row.name];
+      row.byWeek.forEach((c, wi) => {
+        cells.push(c?.target ?? "");
+        day.weeks[wi].sessions.forEach((_, si) => cells.push(c?.sessions[si] ?? ""));
+      });
+      lines.push(cells.map(csvEsc).join(","));
+    }
+  }
+  return lines.join("\n");
+}
+
 export function buildSheetRows(
   weeks: {
     exercises: {

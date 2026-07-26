@@ -394,11 +394,14 @@ export async function getProgramHub(
     const lv = vars.find((v) => v.id === anchor.variationId);
     if (lv) selectedWeek = lv.position;
   }
-  const lastDoneDayId = finished[0]?.dayId ?? null;
   const cellVarByDay = new Map<string, string | null>(
     days.map((d, i) => [d.id, byDay[i].find((v) => v.position === selectedWeek)?.id ?? null]),
   );
   const cellIds = [...cellVarByDay.values()].filter((x): x is string => !!x);
+  const cellIdSet = new Set(cellIds);
+  // "Last done" is scoped to the SELECTED WEEK's cell — when was this day last
+  // trained in this week — so it changes as you switch week tabs.
+  const lastDoneDayId = finished.find((s) => cellIdSet.has(s.variationId))?.dayId ?? null;
   const exs = cellIds.length
     ? await db.query.exercises.findMany({ where: inArray(schema.exercises.variationId, cellIds) })
     : [];
@@ -406,7 +409,7 @@ export async function getProgramHub(
     const cid = cellVarByDay.get(d.id) ?? null;
     const de = exs.filter((e) => e.variationId === cid);
     const sections = [...new Set(de.map((e) => e.sectionName).filter((s): s is string => !!s))];
-    const mine = sessions.filter((s) => s.dayId === d.id);
+    const mineThisWeek = sessions.filter((s) => s.dayId === d.id && s.variationId === cid);
     return {
       id: d.id,
       name: d.name,
@@ -414,10 +417,10 @@ export async function getProgramHub(
       cellVariationId: cid,
       exerciseCount: de.length,
       sectionSummary: sections.join(" · "),
-      unfinishedSessionId: mine.find((s) => !s.finishedAt)?.id ?? null,
+      unfinishedSessionId: mineThisWeek.find((s) => !s.finishedAt)?.id ?? null,
       lastDoneLabel:
-        finished
-          .find((s) => s.dayId === d.id)
+        mineThisWeek
+          .find((s) => s.finishedAt)
           ?.finishedAt?.toLocaleDateString(undefined, { month: "short", day: "numeric" }) ?? null,
     };
   });

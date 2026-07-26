@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildSheetRows } from "./sheet";
+import { buildSheetRows, programSheetToCsv } from "./sheet";
 
 const ex = (id: string, lineageId: string, name: string, sectionName: string | null = null) => ({
   id,
@@ -42,5 +42,46 @@ describe("buildSheetRows", () => {
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].byWeek.map((c) => c?.target)).toEqual(["a1@0", "a2@1"]);
+  });
+});
+
+describe("programSheetToCsv", () => {
+  it("lays out a day block with week/target/session columns and a section row", () => {
+    const csv = programSheetToCsv("My Split", [
+      {
+        name: "Day 1",
+        weeks: [{ position: 0, name: "Week 1", sessions: [{ id: "s1", label: "Nov 6" }] }],
+        rows: [
+          {
+            key: "k",
+            name: "Bench",
+            sectionName: "Chest",
+            weightUnit: "kg",
+            byWeek: [{ target: "4×8 · 40kg", sessions: ["8·8·8·8"] }],
+          },
+        ],
+      },
+    ]);
+    expect(csv.split("\n")).toEqual([
+      "My Split",
+      "",
+      "Day 1",
+      "Exercise,Week 1 · Target,Nov 6",
+      "Chest",
+      "Bench,4×8 · 40kg,8·8·8·8",
+    ]);
+  });
+
+  it("quotes fields containing commas", () => {
+    const csv = programSheetToCsv("P", [
+      {
+        name: "Day 1",
+        weeks: [{ position: 0, name: "Week 1", sessions: [] }],
+        rows: [
+          { key: "k", name: "Row, wide", sectionName: null, weightUnit: "kg", byWeek: [{ target: "x", sessions: [] }] },
+        ],
+      },
+    ]);
+    expect(csv).toContain('"Row, wide",x');
   });
 });
