@@ -30,3 +30,14 @@ input[type="number"]::-webkit-outer-spin-button {
 * {
   -webkit-tap-highlight-color: transparent;
 }
+
+/* Wheel picker: hide the scrollbar so the column reads as a drum. */
+.wheel-scroll {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+.wheel-scroll::-webkit-scrollbar {
+  display: none;
+}

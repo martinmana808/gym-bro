@@ -305,6 +305,7 @@ export function SessionRunner({
                   <NumberSelect
                     value={weight}
                     onChange={setWeight}
+                    title={unit === "bricks" ? "Weight (bricks)" : "Weight (kg)"}
                     min={unit === "bricks" ? 1 : 0}
                     max={unit === "bricks" ? 25 : 300}
                     step={unit === "bricks" ? 1 : 2.5}
@@ -314,12 +315,12 @@ export function SessionRunner({
                 {step.exercise.measurement === "reps" ? (
                   <label className="flex flex-col gap-1.5">
                     <span className="text-sm text-zinc-400">Reps</span>
-                    <NumberSelect value={reps} onChange={setReps} min={0} max={60} step={1} />
+                    <NumberSelect value={reps} onChange={setReps} min={0} max={60} step={1} title="Reps" />
                   </label>
                 ) : (
                   <label className="flex flex-col gap-1.5">
                     <span className="text-sm text-zinc-400">Seconds</span>
-                    <NumberSelect value={seconds} onChange={setSeconds} min={5} max={300} step={5} />
+                    <NumberSelect value={seconds} onChange={setSeconds} min={5} max={300} step={5} title="Seconds" />
                   </label>
                 )}
               </div>
