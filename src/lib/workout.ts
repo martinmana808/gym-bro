@@ -153,6 +153,19 @@ export function formatSessionCell(
   return out;
 }
 
+/**
+ * A session cell for one exercise, using the exercise's TARGET weight as the
+ * baseline: lifting at target prints reps only, and the weight appears in
+ * parens each time it changes — including changing back to the target.
+ * target 40 → "15·15·15·12" | "(35) 10·10 (40) 10 (45) 9"
+ */
+export function formatExerciseSessionCell(
+  e: { targetWeight: number | null; weightUnit: WeightUnit },
+  logs: LoggedSet[],
+): string {
+  return formatSessionCell(logs, e.weightUnit, e.targetWeight);
+}
+
 /** "45s" | "1m" | "1m30" */
 export function formatSeconds(total: number): string {
   const m = Math.floor(total / 60);

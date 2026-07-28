@@ -7,6 +7,7 @@ import {
   formatLoggedSet,
   formatSeconds,
   formatSessionCell,
+  formatExerciseSessionCell,
   formatTarget,
   formatTargetWeight,
   formatWeight,
@@ -181,6 +182,36 @@ describe("formatSessionCell", () => {
   it("sorts by set number and handles empty input", () => {
     expect(formatSessionCell([set(2, 68, 6), set(1, 68, 8)], "kg", 68)).toBe("8·6");
     expect(formatSessionCell([], "kg", null)).toBe("—");
+  });
+});
+
+describe("formatExerciseSessionCell", () => {
+  it("shows no weight at all when every set is at the exercise's target", () => {
+    expect(
+      formatExerciseSessionCell({ targetWeight: 40, weightUnit: "kg" }, [
+        set(1, 40, 15),
+        set(2, 40, 15),
+        set(3, 40, 15),
+        set(4, 40, 12),
+      ]),
+    ).toBe("15·15·15·12");
+  });
+
+  it("brackets the weight every time it changes, including a return to the target", () => {
+    expect(
+      formatExerciseSessionCell({ targetWeight: 40, weightUnit: "kg" }, [
+        set(1, 35, 10),
+        set(2, 35, 10),
+        set(3, 40, 10),
+        set(4, 45, 9),
+      ]),
+    ).toBe("(35) 10·10 (40) 10 (45) 9");
+  });
+
+  it("brackets the first set when the exercise has no target to compare against", () => {
+    expect(
+      formatExerciseSessionCell({ targetWeight: null, weightUnit: "kg" }, [set(1, 50, 10)]),
+    ).toBe("(50) 10");
   });
 });
 

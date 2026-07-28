@@ -2,7 +2,7 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Block, Exercise, Session, SessionNote, SetLog, Variation, Workout } from "@/db/schema";
 import {
-  formatSessionCell,
+  formatExerciseSessionCell,
   formatTarget,
   formatTargetWeight,
   groupExercisesIntoBlocks,
@@ -529,7 +529,7 @@ export async function getProgramSheet(
       const meta = weekMetas[weekIndex];
       const sessionStrings = meta.sessions.map((s) => {
         const cellLogs = logs.filter((l) => l.sessionId === s.id && l.exerciseId === exId);
-        return formatSessionCell(cellLogs, e.weightUnit, null);
+        return formatExerciseSessionCell(e, cellLogs);
       });
       return { target, sessions: sessionStrings };
     };

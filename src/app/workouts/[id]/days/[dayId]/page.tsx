@@ -15,7 +15,7 @@ import {
   formatClock,
   formatCurrentWeight,
   formatSeconds,
-  formatSessionCell,
+  formatExerciseSessionCell,
   formatTarget,
   formatTargetWeight,
 } from "@/lib/workout";
@@ -232,7 +232,7 @@ export default async function DayDetailPage({
                           const note = (history.notesBySession[s.id] ?? []).find((n) => n.exerciseId === e.id)?.note;
                           return (
                             <td key={s.id} className="whitespace-nowrap px-3 py-2.5 tabular-nums">
-                              {formatSessionCell(logs, e.weightUnit, currentWeight(e.id))}
+                              {formatExerciseSessionCell(e, logs)}
                               {note && (
                                 <span title={note} className="ml-0.5 cursor-help text-lime-400">
                                   *
