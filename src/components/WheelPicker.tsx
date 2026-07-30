@@ -18,9 +18,9 @@ function tierFor(absDistance: number): 0 | 1 | 2 {
 }
 
 const TIER_CLASS = [
-  "text-zinc-50 font-semibold",
-  "text-zinc-400",
-  "text-zinc-600",
+  "text-white font-semibold",
+  "text-zinc-500",
+  "text-zinc-700",
 ] as const;
 
 const Row = memo(function Row({
@@ -164,7 +164,7 @@ export function WheelPicker({
           {/* centre band */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-4 z-10 rounded-xl bg-zinc-800/60"
+            className="pointer-events-none absolute inset-x-4 z-10 rounded-xl bg-zinc-800/80 ring-1 ring-white/5"
             style={{ height: ITEM_H, top: PAD }}
           />
           <div
