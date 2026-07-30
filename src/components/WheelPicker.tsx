@@ -164,7 +164,7 @@ export function WheelPicker({
           {/* centre band */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-4 z-10 rounded-xl bg-zinc-800/80 ring-1 ring-white/5"
+            className="pointer-events-none absolute inset-x-4 z-0 rounded-xl bg-zinc-800/80 ring-1 ring-white/5"
             style={{ height: ITEM_H, top: PAD }}
           />
           <div
@@ -183,7 +183,7 @@ export function WheelPicker({
                 onClose();
               }
             }}
-            className="wheel-scroll relative overflow-y-scroll outline-none"
+            className="wheel-scroll relative z-10 overflow-y-scroll outline-none"
             style={{
               height: VISIBLE * ITEM_H,
               scrollSnapType: "y mandatory",
