@@ -1,16 +1,72 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { indexFromScroll, scrollForIndex } from "@/lib/wheel";
 
-const ITEM_H = 44; // px per row
-const VISIBLE = 5; // rows shown; must be odd so one row sits centred
+const ITEM_H = 40; // px per row
+const VISIBLE = 7; // rows shown; odd so one row sits centred
 const PAD = ((VISIBLE - 1) / 2) * ITEM_H;
+
+/** Row styling is driven by DISTANCE FROM THE CENTRE, not by which value is
+ * selected — so the white row is always the one under the band, even mid-scroll.
+ * Three tiers, as on the iOS drum: centre, neighbours, and the faded rest. */
+function tierFor(absDistance: number): 0 | 1 | 2 {
+  if (absDistance < 0.5) return 0;
+  if (absDistance < 1.5) return 1;
+  return 2;
+}
+
+const TIER_CLASS = [
+  "text-zinc-50 font-semibold",
+  "text-zinc-400",
+  "text-zinc-600",
+] as const;
+
+const Row = memo(function Row({
+  label,
+  tier,
+  rot,
+  scale,
+  onSelect,
+}: {
+  label: string;
+  tier: 0 | 1 | 2;
+  rot: number;
+  scale: number;
+  onSelect: () => void;
+}) {
+  return (
+    <div
+      onClick={onSelect}
+      className="cursor-pointer"
+      style={{ height: ITEM_H, scrollSnapAlign: "center" }}
+    >
+      {/* Transform lives on an inner node so scroll-snap still measures the
+          untransformed row box (otherwise snapping drifts). */}
+      <div
+        className={`grid h-full place-items-center text-2xl tabular-nums ${TIER_CLASS[tier]}`}
+        style={{
+          transform: `rotateX(${rot}deg) scale(${scale})`,
+          transformOrigin: "center center",
+          willChange: "transform",
+        }}
+      >
+        {label}
+      </div>
+    </div>
+  );
+});
 
 /**
  * An iOS-style wheel ("picker view") in a bottom sheet. Modern iOS renders a
  * native <select> as a flat menu, so the drum is built here: a scroll-snapping
- * column with a highlighted centre band and a faded top/bottom edge.
+ * column, a highlighted centre band, three distance-based colour tiers, and a
+ * faked cylinder (rows rotate away and shrink towards the edges).
+ *
+ * Rendered through a portal: the trigger usually sits inside a <label>, and a
+ * click anywhere inside a label is forwarded to its control — which would eat
+ * every tap on Done and on the backdrop.
  */
 export function WheelPicker({
   options,
@@ -29,18 +85,25 @@ export function WheelPicker({
   title?: string;
 }) {
   const listRef = useRef<HTMLDivElement>(null);
-  const settle = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const rafRef = useRef<number | null>(null);
   const startIndex = Math.max(0, options.indexOf(value));
+  // Fractional centre position, in rows. Drives colour + curvature live.
+  const [centre, setCentre] = useState(startIndex);
+  const [mounted, setMounted] = useState(false);
 
-  // Jump to the current value when the sheet opens (no smooth scroll: it should
-  // already be under the centre band on the first frame).
+  useEffect(() => setMounted(true), []);
+
+  // Open already scrolled to the current value.
   useEffect(() => {
+    if (!mounted) return;
     const el = listRef.current;
-    if (el) el.scrollTop = scrollForIndex(startIndex, ITEM_H);
+    if (el) {
+      el.scrollTop = scrollForIndex(startIndex, ITEM_H);
+      setCentre(startIndex);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [mounted]);
 
-  // Close on Escape.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -49,26 +112,38 @@ export function WheelPicker({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const commitFromScroll = () => {
-    const el = listRef.current;
-    if (!el) return;
-    const i = indexFromScroll(el.scrollTop, ITEM_H, options.length);
-    const next = options[i];
-    if (next != null && next !== value) onChange(next);
+  useEffect(() => () => {
+    if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+  }, []);
+
+  const handleScroll = () => {
+    if (rafRef.current != null) return;
+    rafRef.current = requestAnimationFrame(() => {
+      rafRef.current = null;
+      const el = listRef.current;
+      if (el) setCentre(el.scrollTop / ITEM_H);
+    });
   };
 
-  const step = (delta: number) => {
-    const el = listRef.current;
-    if (!el) return;
-    const i = indexFromScroll(el.scrollTop, ITEM_H, options.length);
-    const target = Math.min(options.length - 1, Math.max(0, i + delta));
-    el.scrollTo({ top: scrollForIndex(target, ITEM_H), behavior: "smooth" });
-    const next = options[target];
+  // Commit whenever the centred row changes, so the field tracks the drum live.
+  const centreIndex = indexFromScroll(centre * ITEM_H, ITEM_H, options.length);
+  useEffect(() => {
+    const next = options[centreIndex];
     if (next != null && next !== value) onChange(next);
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [centreIndex]);
 
-  return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" role="dialog" aria-modal="true">
+  const scrollToIndex = useCallback((i: number) => {
+    listRef.current?.scrollTo({ top: scrollForIndex(i, ITEM_H), behavior: "smooth" });
+  }, []);
+
+  const step = (delta: number) =>
+    scrollToIndex(Math.min(options.length - 1, Math.max(0, centreIndex + delta)));
+
+  if (!mounted) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[100] flex flex-col justify-end" role="dialog" aria-modal="true">
       <button
         aria-label="Close picker"
         onClick={onClose}
@@ -79,7 +154,7 @@ export function WheelPicker({
           <span className="text-sm text-zinc-400">{title}</span>
           <button
             onClick={onClose}
-            className="rounded-full bg-lime-400 px-5 py-1.5 text-sm font-bold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.98]"
+            className="rounded-full bg-lime-400 px-6 py-2 text-sm font-bold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.98]"
           >
             Done
           </button>
@@ -89,16 +164,13 @@ export function WheelPicker({
           {/* centre band */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-4 z-10 rounded-xl bg-zinc-800/70"
+            className="pointer-events-none absolute inset-x-4 z-10 rounded-xl bg-zinc-800/60"
             style={{ height: ITEM_H, top: PAD }}
           />
           <div
             ref={listRef}
             tabIndex={0}
-            onScroll={() => {
-              if (settle.current) clearTimeout(settle.current);
-              settle.current = setTimeout(commitFromScroll, 90);
-            }}
+            onScroll={handleScroll}
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") {
                 e.preventDefault();
@@ -115,33 +187,38 @@ export function WheelPicker({
             style={{
               height: VISIBLE * ITEM_H,
               scrollSnapType: "y mandatory",
+              perspective: 520,
+              perspectiveOrigin: "center center",
               WebkitMaskImage:
-                "linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent)",
-              maskImage: "linear-gradient(to bottom, transparent, #000 22%, #000 78%, transparent)",
+                "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.25) 10%, #000 34%, #000 66%, rgba(0,0,0,0.25) 90%, transparent 100%)",
+              maskImage:
+                "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.25) 10%, #000 34%, #000 66%, rgba(0,0,0,0.25) 90%, transparent 100%)",
             }}
           >
             <div style={{ height: PAD }} />
-            {options.map((o) => (
-              <div
-                key={o}
-                onClick={() => {
-                  const el = listRef.current;
-                  const i = options.indexOf(o);
-                  el?.scrollTo({ top: scrollForIndex(i, ITEM_H), behavior: "smooth" });
-                  if (o !== value) onChange(o);
-                }}
-                className={`grid cursor-pointer place-items-center text-xl tabular-nums transition-colors ${
-                  o === value ? "font-semibold text-zinc-50" : "text-zinc-500"
-                }`}
-                style={{ height: ITEM_H, scrollSnapAlign: "center" }}
-              >
-                {labels?.[o] ?? o}
-              </div>
-            ))}
+            {options.map((o, i) => {
+              const d = i - centre;
+              const ad = Math.abs(d);
+              // Rows rotate away from the viewer and shrink towards the edges,
+              // so the column reads as the surface of a rotating cylinder.
+              const rot = Math.round(Math.max(-72, Math.min(72, d * 24)));
+              const scale = Math.round(Math.max(0.66, 1 - ad * 0.09) * 100) / 100;
+              return (
+                <Row
+                  key={o}
+                  label={labels?.[o] ?? o}
+                  tier={tierFor(ad)}
+                  rot={rot}
+                  scale={scale}
+                  onSelect={() => scrollToIndex(i)}
+                />
+              );
+            })}
             <div style={{ height: PAD }} />
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
