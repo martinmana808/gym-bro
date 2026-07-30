@@ -2,38 +2,32 @@
 
 import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { indexFromScroll, scrollForIndex } from "@/lib/wheel";
-
-const ITEM_H = 40; // px per row
-const VISIBLE = 7; // rows shown; odd so one row sits centred
-const PAD = ((VISIBLE - 1) / 2) * ITEM_H;
+import { HEIGHT, ITEM_H, PAD, indexFromScroll, rowGeometry, scrollForIndex } from "@/lib/wheel";
 
 /** Row styling is driven by DISTANCE FROM THE CENTRE, not by which value is
  * selected — so the white row is always the one under the band, even mid-scroll.
- * Three tiers, as on the iOS drum: centre, neighbours, and the faded rest. */
+ * Three tiers, as on the iOS drum: centre, neighbours, and the rest. */
 function tierFor(absDistance: number): 0 | 1 | 2 {
   if (absDistance < 0.5) return 0;
   if (absDistance < 1.5) return 1;
   return 2;
 }
 
-const TIER_CLASS = [
-  "text-white font-semibold",
-  "text-zinc-500",
-  "text-zinc-700",
-] as const;
+const TIER_CLASS = ["text-white font-medium", "text-zinc-400", "text-zinc-500"] as const;
 
 const Row = memo(function Row({
   label,
   tier,
+  translateY,
   rot,
-  scale,
+  opacity,
   onSelect,
 }: {
   label: string;
   tier: 0 | 1 | 2;
+  translateY: number;
   rot: number;
-  scale: number;
+  opacity: number;
   onSelect: () => void;
 }) {
   return (
@@ -45,11 +39,12 @@ const Row = memo(function Row({
       {/* Transform lives on an inner node so scroll-snap still measures the
           untransformed row box (otherwise snapping drifts). */}
       <div
-        className={`grid h-full place-items-center text-2xl tabular-nums ${TIER_CLASS[tier]}`}
+        className={`grid h-full place-items-center text-[28px] tabular-nums ${TIER_CLASS[tier]}`}
         style={{
-          transform: `rotateX(${rot}deg) scale(${scale})`,
+          transform: `translateY(${translateY}px) rotateX(${rot}deg)`,
           transformOrigin: "center center",
-          willChange: "transform",
+          opacity,
+          willChange: "transform, opacity",
         }}
       >
         {label}
@@ -150,13 +145,21 @@ export function WheelPicker({
         className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
       />
       <div className="relative w-full rounded-t-3xl border-t border-zinc-800 bg-zinc-900 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
-        <div className="flex items-center justify-between px-4 pb-1 pt-3">
-          <span className="text-sm text-zinc-400">{title}</span>
+        <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 pb-1 pt-4">
           <button
             onClick={onClose}
-            className="rounded-full bg-lime-400 px-6 py-2 text-sm font-bold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.98]"
+            aria-label="Close"
+            className="grid size-11 place-items-center rounded-full bg-zinc-800 text-xl text-zinc-300 transition hover:bg-zinc-700"
           >
-            Done
+            ✕
+          </button>
+          <span className="text-center text-base font-semibold text-zinc-100">{title}</span>
+          <button
+            onClick={onClose}
+            aria-label="Done"
+            className="grid size-11 place-items-center rounded-full bg-lime-400 text-xl font-bold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.97]"
+          >
+            ✓
           </button>
         </div>
 
@@ -164,7 +167,7 @@ export function WheelPicker({
           {/* centre band */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-4 z-0 rounded-xl bg-zinc-800/80 ring-1 ring-white/5"
+            className="pointer-events-none absolute inset-x-4 z-0 rounded-2xl bg-zinc-800/70"
             style={{ height: ITEM_H, top: PAD }}
           />
           <div
@@ -185,31 +188,24 @@ export function WheelPicker({
             }}
             className="wheel-scroll relative z-10 overflow-y-scroll outline-none"
             style={{
-              height: VISIBLE * ITEM_H,
+              height: HEIGHT,
               scrollSnapType: "y mandatory",
-              perspective: 520,
+              perspective: 900,
               perspectiveOrigin: "center center",
-              WebkitMaskImage:
-                "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.25) 10%, #000 34%, #000 66%, rgba(0,0,0,0.25) 90%, transparent 100%)",
-              maskImage:
-                "linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.25) 10%, #000 34%, #000 66%, rgba(0,0,0,0.25) 90%, transparent 100%)",
             }}
           >
             <div style={{ height: PAD }} />
             {options.map((o, i) => {
               const d = i - centre;
-              const ad = Math.abs(d);
-              // Rows rotate away from the viewer and shrink towards the edges,
-              // so the column reads as the surface of a rotating cylinder.
-              const rot = Math.round(Math.max(-72, Math.min(72, d * 24)));
-              const scale = Math.round(Math.max(0.66, 1 - ad * 0.09) * 100) / 100;
+              const g = rowGeometry(d);
               return (
                 <Row
                   key={o}
                   label={labels?.[o] ?? o}
-                  tier={tierFor(ad)}
-                  rot={rot}
-                  scale={scale}
+                  tier={tierFor(Math.abs(d))}
+                  translateY={Math.round(g.translateY * 10) / 10}
+                  rot={Math.round(g.rot * 10) / 10}
+                  opacity={Math.round(g.opacity * 100) / 100}
                   onSelect={() => scrollToIndex(i)}
                 />
               );

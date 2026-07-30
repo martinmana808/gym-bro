@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { indexFromScroll, scrollForIndex } from "./wheel";
+import { ITEM_H, indexFromScroll, rowGeometry, scrollForIndex } from "./wheel";
 
 describe("indexFromScroll", () => {
   it("maps an exact row offset to that row", () => {
@@ -31,5 +31,38 @@ describe("scrollForIndex", () => {
 
   it("never returns a negative offset", () => {
     expect(scrollForIndex(-2, 44)).toBe(0);
+  });
+});
+
+/** Where a row actually lands on screen, relative to the centre row. */
+const screenY = (d: number) => d * ITEM_H + rowGeometry(d).translateY;
+
+describe("rowGeometry (cylinder projection)", () => {
+  it("leaves the centre row untouched", () => {
+    const g = rowGeometry(0);
+    expect(g.translateY).toBeCloseTo(0);
+    expect(g.rot).toBeCloseTo(0);
+    expect(g.opacity).toBeCloseTo(1);
+  });
+
+  it("bunches rows closer together the further they are from the centre", () => {
+    const gap1 = screenY(1) - screenY(0);
+    const gap3 = screenY(3) - screenY(2);
+    const gap4 = screenY(4) - screenY(3);
+    expect(gap3).toBeLessThan(gap1);
+    expect(gap4).toBeLessThan(gap3);
+  });
+
+  it("rotates and fades rows further out, symmetrically about the centre", () => {
+    expect(Math.abs(rowGeometry(2).rot)).toBeGreaterThan(Math.abs(rowGeometry(1).rot));
+    expect(rowGeometry(3).opacity).toBeLessThan(rowGeometry(1).opacity);
+    expect(rowGeometry(-2).opacity).toBeCloseTo(rowGeometry(2).opacity);
+    expect(rowGeometry(-2).translateY).toBeCloseTo(-rowGeometry(2).translateY);
+  });
+
+  it("hides rows that have turned past the edge of the drum", () => {
+    expect(rowGeometry(5).hidden).toBe(true);
+    expect(rowGeometry(5).opacity).toBe(0);
+    expect(rowGeometry(4).hidden).toBe(false);
   });
 });
