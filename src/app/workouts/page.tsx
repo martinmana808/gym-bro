@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUserId, signOut } from "@/auth";
 import { listPrograms } from "@/db/queries";
+import { NotificationSettings } from "@/components/NotificationSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,8 @@ export default async function WorkoutsPage() {
       >
         + New workout
       </Link>
+
+      <NotificationSettings />
 
       <div className="flex justify-center gap-5 text-sm text-zinc-600">
         <Link href="/import" className="transition hover:text-zinc-300">

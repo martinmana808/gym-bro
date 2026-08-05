@@ -124,6 +124,33 @@ export const sessionNotes = pgTable(
   (t) => [uniqueIndex("session_notes_unique").on(t.sessionId, t.exerciseId)],
 );
 
+// One row per installed device that opted into push. `endpoint` is the push
+// service URL the browser handed us; it is the natural key (a device that
+// re-subscribes gets a new one, and stale ones are deleted on 404/410).
+export const pushSubscriptions = pgTable("push_subscriptions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  endpoint: text("endpoint").notNull().unique(),
+  p256dh: text("p256dh").notNull(),
+  auth: text("auth").notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+// The one pending "rest is over" push per user. iOS can't schedule a local
+// notification, so the server holds the timer: a request sleeps until `fireAt`
+// and only pushes if `token` still matches (skip/extend/next set replace it).
+export const restAlerts = pgTable("rest_alerts", {
+  userId: uuid("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  token: uuid("token").notNull(),
+  fireAt: timestamp("fire_at", { withTimezone: true }).notNull(),
+  sessionId: uuid("session_id").references(() => sessions.id, { onDelete: "cascade" }),
+  body: text("body"),
+});
+
 export type Program = typeof programs.$inferSelect;
 export type Day = typeof days.$inferSelect;
 export type Variation = typeof variations.$inferSelect;
@@ -131,6 +158,8 @@ export type Exercise = typeof exercises.$inferSelect;
 export type Session = typeof sessions.$inferSelect;
 export type SetLog = typeof setLogs.$inferSelect;
 export type SessionNote = typeof sessionNotes.$inferSelect;
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type RestAlert = typeof restAlerts.$inferSelect;
 
 // Compat shapes the query layer synthesizes so the existing UI is unchanged.
 // A "workout" in the UI is a Day + its Base variation; a "block" is a run of

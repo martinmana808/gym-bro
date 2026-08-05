@@ -19,6 +19,7 @@ import { NumberSelect } from "@/components/NumberSelect";
 import { SetGrid } from "@/components/SetGrid";
 import { useWakeLock } from "@/lib/useWakeLock";
 import { primeAudio, restAlert } from "@/lib/restAlert";
+import { cancelRestPush, scheduleRestPush } from "@/lib/usePush";
 
 export type LogEntry = SetEntry;
 
@@ -125,6 +126,32 @@ export function SessionRunner({
     }
   }, [resting, restRemaining]);
 
+  // The server also holds a copy of this timer so a backgrounded phone still
+  // gets buzzed (iOS freezes our JS). If we're still on screen as it runs out,
+  // drop the push a moment early — the in-app beep is about to cover it.
+  const pushDroppedFor = useRef<typeof resting>(null);
+  useEffect(() => {
+    if (
+      resting &&
+      restRemaining <= 2 &&
+      pushDroppedFor.current !== resting &&
+      document.visibilityState === "visible"
+    ) {
+      pushDroppedFor.current = resting;
+      void cancelRestPush();
+    }
+  }, [resting, restRemaining]);
+
+  const startRest = (seconds: number, nextExercise: string | null) => {
+    setResting({ endsAt: Date.now() + seconds * 1000, total: seconds });
+    void scheduleRestPush({ seconds, nextExercise, sessionId });
+  };
+
+  const stopRest = () => {
+    setResting(null);
+    void cancelRestPush();
+  };
+
   const submitSet = async (over?: { reps?: number; ok?: boolean }) => {
     primeAudio();
     if (!step) return;
@@ -155,7 +182,7 @@ export function SessionRunner({
     const next = steps[flatIndex + 1];
     if (next?.kind === "rest") {
       setJustDid(`${step.exercise.name} · ${formatLoggedSet(entry, step.exercise.weightUnit)}`);
-      setResting({ endsAt: Date.now() + next.seconds * 1000, total: next.seconds });
+      startRest(next.seconds, setSteps[setIndex + 1]?.exercise.name ?? null);
     }
     if (setIndex < setSteps.length - 1) setSetIndex(setIndex + 1);
   };
@@ -163,6 +190,7 @@ export function SessionRunner({
   const finish = async () => {
     if (!done && !confirm("Some sets are not logged yet. Finish anyway?")) return;
     setFinishing(true);
+    void cancelRestPush();
     try {
       await finishSession(sessionId);
       router.refresh();
@@ -175,6 +203,7 @@ export function SessionRunner({
   const discard = async () => {
     if (!confirm("Discard this session? Its logged sets will be deleted.")) return;
     setDiscarding(true);
+    void cancelRestPush();
     try {
       await deleteSession(sessionId); // redirects back to the workout page
     } catch (e) {
@@ -232,8 +261,16 @@ export function SessionRunner({
         <RestScreen
           remaining={restRemaining}
           total={resting.total}
-          onExtend={() => setResting((r) => r && { ...r, endsAt: r.endsAt + 30_000 })}
-          onSkip={() => setResting(null)}
+          onExtend={() => {
+            setResting((r) => r && { ...r, endsAt: r.endsAt + 30_000 });
+            // Re-arm the server timer so the push slides with the countdown.
+            void scheduleRestPush({
+              seconds: Math.max(1, restRemaining) + 30,
+              nextExercise: step?.exercise.name ?? null,
+              sessionId,
+            });
+          }}
+          onSkip={stopRest}
           nextUp={step ? step.exercise.name : null}
           justDid={justDid}
         />
@@ -423,7 +460,7 @@ export function SessionRunner({
                 );
                 if (i !== -1) {
                   setSetIndex(i);
-                  setResting(null);
+                  stopRest();
                 }
                 setShowGrid(false);
               }}

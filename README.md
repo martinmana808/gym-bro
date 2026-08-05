@@ -18,6 +18,10 @@ what you planned, session by session.
   workout duration. Interrupted sessions can be resumed.
 - **History** — the spreadsheet view, live: rows are exercises, columns are
   past sessions, cells are the sets you logged (`80×8 · 80×8 · 80×6`).
+- **Rest-timer push notifications** — install it to your iPhone home screen and
+  get buzzed when rest is up, even with the app closed. iOS can't schedule a
+  local notification, so the server holds the timer and pushes when it elapses.
+  Setup and the home-screen/widget options: [`docs/ios-home-screen.md`](docs/ios-home-screen.md).
 - **Google login** via Auth.js, with a zero-config dev login for local use.
 
 ## Getting started (local)
@@ -56,6 +60,9 @@ AUTH_GOOGLE_SECRET=...
 1. Provision a Postgres database (Neon via the Vercel Marketplace works well)
    and set `DATABASE_URL`.
 2. Set `AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`.
+   For push, also generate a VAPID keypair (`npx web-push generate-vapid-keys`)
+   and set `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT`.
+   Without them the notification card simply doesn't appear.
 3. Apply the schema once: `DATABASE_URL=... npm run db:migrate`.
 4. `vercel deploy` (or connect the repo).
 
