@@ -34,6 +34,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         workoutId={structure.workout.id}
         workoutName={structure.workout.name}
         startedAtMs={session.startedAt.getTime()}
+        restEndsAtMs={session.restEndsAt ? session.restEndsAt.getTime() : null}
         defaultRestSeconds={structure.workout.defaultRestSeconds}
         blocks={structure.blocks.map((b) => ({
           id: b.id,

@@ -85,6 +85,10 @@ export const sessions = pgTable("sessions", {
     .references(() => users.id, { onDelete: "cascade" }),
   startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
   finishedAt: timestamp("finished_at", { withTimezone: true }),
+  // When the current rest ends. Server-side so the countdown survives leaving
+  // the page, reloading, or closing the app — and so the active-session bar
+  // can show it from anywhere. Null when not resting.
+  restEndsAt: timestamp("rest_ends_at", { withTimezone: true }),
 });
 
 export const setLogs = pgTable(

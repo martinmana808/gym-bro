@@ -29,6 +29,13 @@
       "when": 1785953923447,
       "tag": "0003_common_jazinda",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1786511242873,
+      "tag": "0004_loving_jack_power",
+      "breakpoints": true
     }
   ]
 }

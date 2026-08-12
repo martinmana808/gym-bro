@@ -1,0 +1,1 @@
+ALTER TABLE "sessions" ADD COLUMN "rest_ends_at" timestamp with time zone;

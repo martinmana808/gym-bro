@@ -19,7 +19,7 @@ import { NumberSelect } from "@/components/NumberSelect";
 import { SetGrid } from "@/components/SetGrid";
 import { useWakeLock } from "@/lib/useWakeLock";
 import { primeAudio, restAlert } from "@/lib/restAlert";
-import { cancelRestPush, scheduleRestPush } from "@/lib/usePush";
+import { clearRestOnServer, startRestOnServer } from "@/lib/usePush";
 
 export type LogEntry = SetEntry;
 
@@ -33,6 +33,7 @@ export function SessionRunner({
   workoutId,
   workoutName,
   startedAtMs,
+  restEndsAtMs,
   defaultRestSeconds,
   blocks,
   initialLogs,
@@ -44,6 +45,7 @@ export function SessionRunner({
   workoutId: string;
   workoutName: string;
   startedAtMs: number;
+  restEndsAtMs: number | null;
   defaultRestSeconds: number;
   blocks: RunnerBlock[];
   initialLogs: LogEntry[];
@@ -73,7 +75,13 @@ export function SessionRunner({
     );
     return i === -1 ? Math.max(0, setSteps.length - 1) : i;
   });
-  const [resting, setResting] = useState<{ endsAt: number; total: number } | null>(null);
+  // Seeded from the server so reloading (or coming back from another page)
+  // doesn't lose a running rest.
+  const [resting, setResting] = useState<{ endsAt: number; total: number } | null>(() =>
+    restEndsAtMs != null && restEndsAtMs > Date.now()
+      ? { endsAt: restEndsAtMs, total: Math.ceil((restEndsAtMs - Date.now()) / 1000) }
+      : null,
+  );
   const [justDid, setJustDid] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
@@ -138,18 +146,18 @@ export function SessionRunner({
       document.visibilityState === "visible"
     ) {
       pushDroppedFor.current = resting;
-      void cancelRestPush();
+      void clearRestOnServer(sessionId);
     }
-  }, [resting, restRemaining]);
+  }, [resting, restRemaining, sessionId]);
 
   const startRest = (seconds: number, nextExercise: string | null) => {
     setResting({ endsAt: Date.now() + seconds * 1000, total: seconds });
-    void scheduleRestPush({ seconds, nextExercise, sessionId });
+    void startRestOnServer({ seconds, nextExercise, sessionId });
   };
 
   const stopRest = () => {
     setResting(null);
-    void cancelRestPush();
+    void clearRestOnServer(sessionId);
   };
 
   const submitSet = async (over?: { reps?: number; ok?: boolean }) => {
@@ -190,7 +198,7 @@ export function SessionRunner({
   const finish = async () => {
     if (!done && !confirm("Some sets are not logged yet. Finish anyway?")) return;
     setFinishing(true);
-    void cancelRestPush();
+    void clearRestOnServer(sessionId);
     try {
       await finishSession(sessionId);
       router.refresh();
@@ -203,7 +211,7 @@ export function SessionRunner({
   const discard = async () => {
     if (!confirm("Discard this session? Its logged sets will be deleted.")) return;
     setDiscarding(true);
-    void cancelRestPush();
+    void clearRestOnServer(sessionId);
     try {
       await deleteSession(sessionId); // redirects back to the workout page
     } catch (e) {
@@ -264,7 +272,7 @@ export function SessionRunner({
           onExtend={() => {
             setResting((r) => r && { ...r, endsAt: r.endsAt + 30_000 });
             // Re-arm the server timer so the push slides with the countdown.
-            void scheduleRestPush({
+            void startRestOnServer({
               seconds: Math.max(1, restRemaining) + 30,
               nextExercise: step?.exercise.name ?? null,
               sessionId,

@@ -2,11 +2,14 @@ import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { getDb, schema } from "@/db";
 import type { Block, Exercise, Session, SessionNote, SetLog, Variation, Workout } from "@/db/schema";
 import {
+  buildSteps,
   formatExerciseSessionCell,
   formatTarget,
   formatTargetWeight,
   groupExercisesIntoBlocks,
+  type SetStep,
 } from "@/lib/workout";
+import type { ActiveSessionInput } from "@/lib/activeSession";
 import { deriveWeeks, missingCells, type WeekCol } from "@/lib/weeks";
 import { buildSheetRows, type SheetRow, type SheetWeekMeta } from "@/lib/sheet";
 
@@ -537,4 +540,62 @@ export async function getProgramSheet(
     return { id: day.id, name: day.name, weeks: weekMetas, rows };
   });
   return { program: { id: program.id, name: program.name }, days: outDays };
+}
+
+export type ActiveSessionSummary = {
+  sessionId: string;
+  programId: string;
+  dayId: string;
+} & ActiveSessionInput;
+
+/**
+ * The session the user is in the middle of right now, for the bottom bar —
+ * most recently started unfinished one, or null. Reuses `buildSteps` so the
+ * bar's "current exercise" can never disagree with the session runner's.
+ */
+export async function getActiveSession(userId: string): Promise<ActiveSessionSummary | null> {
+  const db = await getDb();
+  const session = await db.query.sessions.findFirst({
+    where: and(eq(schema.sessions.userId, userId), isNull(schema.sessions.finishedAt)),
+    orderBy: desc(schema.sessions.startedAt),
+  });
+  if (!session) return null;
+
+  const structure = await getVariationStructure(session.variationId, userId);
+  if (!structure) return null;
+
+  const variations = await db.query.variations.findMany({
+    where: eq(schema.variations.dayId, structure.workout.id),
+  });
+  const program = await db.query.programs.findFirst({
+    where: eq(schema.programs.id, structure.workout.programId),
+  });
+  const logs = await db.query.setLogs.findMany({
+    where: eq(schema.setLogs.sessionId, session.id),
+  });
+
+  const steps = buildSteps(
+    structure.blocks.map((b) => ({ id: b.id, exercises: b.exercises })),
+    structure.workout.defaultRestSeconds,
+  )
+    .filter((s): s is SetStep => s.kind === "set")
+    .map((s) => ({
+      exerciseId: s.exercise.id,
+      exerciseName: s.exercise.name,
+      setNumber: s.setNumber,
+      rounds: s.rounds,
+    }));
+
+  return {
+    sessionId: session.id,
+    programId: structure.workout.programId,
+    dayId: structure.workout.id,
+    dayName: structure.workout.name,
+    programName: program?.name ?? "",
+    weekName: structure.variation.name,
+    weekCount: variations.length,
+    restEndsAtMs: session.restEndsAt ? session.restEndsAt.getTime() : null,
+    steps,
+    loggedKeys: logs.map((l) => `${l.exerciseId}#${l.setNumber}`),
+  };
 }

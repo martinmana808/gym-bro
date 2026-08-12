@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
+import { ActiveSessionBar } from "@/components/ActiveSessionBar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,6 +45,7 @@ export default function RootLayout({
       <body className="flex min-h-full flex-col pt-[env(safe-area-inset-top)] text-zinc-100">
         <ServiceWorkerRegistrar />
         {children}
+        <ActiveSessionBar />
       </body>
     </html>
   );

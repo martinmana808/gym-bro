@@ -157,14 +157,17 @@ export function usePush(): PushState {
   };
 }
 
-/** Ask the server to push when this rest ends (no-op if push isn't on). */
-export async function scheduleRestPush(input: {
+/**
+ * Tell the server rest has started: it persists the end time (so the countdown
+ * survives reload and shows in the bottom bar) and schedules the push.
+ */
+export async function startRestOnServer(input: {
   seconds: number;
   nextExercise: string | null;
   sessionId: string;
 }) {
   try {
-    await fetch("/api/push/rest", {
+    await fetch("/api/session/rest", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
@@ -175,9 +178,14 @@ export async function scheduleRestPush(input: {
   }
 }
 
-/** Drop any pending rest push (skipped, extended, or moved on). */
-export async function cancelRestPush() {
+/** Rest is over or abandoned (skipped, finished, moved on). */
+export async function clearRestOnServer(sessionId?: string) {
   try {
-    await fetch("/api/push/rest", { method: "DELETE", keepalive: true });
+    await fetch("/api/session/rest", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId: sessionId ?? "" }),
+      keepalive: true,
+    });
   } catch {}
 }
