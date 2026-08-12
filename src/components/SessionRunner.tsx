@@ -306,7 +306,7 @@ export function SessionRunner({
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-[7.5rem] pt-4">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-[8.75rem] pt-4">
         <div className="flex items-center gap-3 pb-2">
           <Link
             href={`/workouts/${programId}/days/${workoutId}`}

@@ -41,7 +41,7 @@ export function SessionWidget({
       <div className="flex items-center gap-2.5 py-2.5 pl-3 pr-2">
         <span className={`h-9 w-1 shrink-0 rounded-full ${accent.bar}`} />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[0.7rem] font-medium uppercase tracking-[0.12em] text-zinc-500">
+          <span className="block truncate text-[0.7rem] font-medium uppercase tracking-[0.06em] text-zinc-500">
             {view.label}
           </span>
           <span className="mt-0.5 flex items-baseline gap-2">
