@@ -226,45 +226,8 @@ export function SessionRunner({
   const prev = step ? prevMap.get(logKey(step.exercise.id, step.setNumber)) : undefined;
 
   return (
-    <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <header className="flex items-center gap-3 py-4">
-        <Link
-          href={`/workouts/${programId}/days/${workoutId}`}
-          aria-label="Leave session — your progress is saved"
-          title="Leave session — your progress is saved"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
-        >
-          ←
-        </Link>
-        <div className="min-w-0 flex-1">
-          <h1 className="truncate font-semibold tracking-tight">{workoutName}</h1>
-          <p className="text-sm text-zinc-400">
-            <span className="tabular-nums">{elapsed}</span> · {loggedCount}/{setSteps.length} sets
-          </p>
-        </div>
-        <button
-          onClick={() => setShowGrid(true)}
-          aria-label="Show all sets"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
-        >
-          ▦
-        </button>
-        <button
-          onClick={finish}
-          disabled={finishing || discarding}
-          className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-lime-400 hover:text-lime-400 disabled:opacity-50"
-        >
-          {finishing ? "Finishing…" : "Finish"}
-        </button>
-      </header>
-
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800/80">
-        <div
-          className="h-full rounded-full bg-lime-400 transition-all duration-500"
-          style={{ width: `${(loggedCount / Math.max(1, setSteps.length)) * 100}%` }}
-        />
-      </div>
-
+    <>
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-[8.5rem] pt-4">
       {isResting && resting ? (
         <RestScreen
           remaining={restRemaining}
@@ -477,7 +440,52 @@ export function SessionRunner({
           </div>
         </div>
       )}
-    </div>
+      </div>
+
+      {/* Session controls live at the bottom, in the same place the "session in
+          progress" bar sits on every other page — so moving between them
+          doesn't make the workout summary jump from bottom to top. */}
+      <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="mx-auto w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/95 shadow-lg shadow-black/40 backdrop-blur">
+          <div className="h-1 w-full bg-zinc-800/80">
+            <div
+              className="h-full bg-lime-400 transition-all duration-500"
+              style={{ width: `${(loggedCount / Math.max(1, setSteps.length)) * 100}%` }}
+            />
+          </div>
+          <header className="flex items-center gap-3 px-3 py-2.5">
+            <Link
+              href={`/workouts/${programId}/days/${workoutId}`}
+              aria-label="Leave session — your progress is saved"
+              title="Leave session — your progress is saved"
+              className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-950/60 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+            >
+              ←
+            </Link>
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate font-semibold tracking-tight">{workoutName}</h1>
+              <p className="text-sm text-zinc-400">
+                <span className="tabular-nums">{elapsed}</span> · {loggedCount}/{setSteps.length} sets
+              </p>
+            </div>
+            <button
+              onClick={() => setShowGrid(true)}
+              aria-label="Show all sets"
+              className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-950/60 text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+            >
+              ▦
+            </button>
+            <button
+              onClick={finish}
+              disabled={finishing || discarding}
+              className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-lime-400 hover:text-lime-400 disabled:opacity-50"
+            >
+              {finishing ? "Finishing…" : "Finish"}
+            </button>
+          </header>
+        </div>
+      </div>
+    </>
   );
 }
 

@@ -108,14 +108,9 @@ export default async function DayDetailPage({
         basePath={`/workouts/${programId}/days/${dayId}`}
       />
 
-      {unfinished ? (
-        <Link
-          href={`/sessions/${unfinished.id}`}
-          className="rounded-2xl bg-amber-400 py-3.5 text-center font-bold text-zinc-950 shadow-lg shadow-amber-400/15 transition hover:bg-amber-300 active:scale-[0.98]"
-        >
-          Resume session in progress
-        </Link>
-      ) : (
+      {/* Nothing to show while a session is running — the fixed bar at the
+          bottom of the screen already says so and links straight into it. */}
+      {!unfinished && (
         <form action={startSession.bind(null, dayId, cellVariationId)}>
           <button className="w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98]">
             Start workout
