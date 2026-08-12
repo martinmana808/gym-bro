@@ -15,7 +15,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const userId = await requireUserId();
   const data = await getSessionData(id, userId);
   if (!data) notFound();
-  const { session, structure, logs, previousLogs, notes } = data;
+  const { session, structure, logs, previousLogs, notes, programName, weekName, weekCount } = data;
 
   const toEntry = (l: (typeof logs)[number]): LogEntry => ({
     exerciseId: l.exerciseId,
@@ -35,6 +35,11 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         workoutName={structure.workout.name}
         startedAtMs={session.startedAt.getTime()}
         restEndsAtMs={session.restEndsAt ? session.restEndsAt.getTime() : null}
+        initialPausedAtMs={session.pausedAt ? session.pausedAt.getTime() : null}
+        initialPausedMs={session.pausedMs}
+        programName={programName}
+        weekName={weekName}
+        weekCount={weekCount}
         defaultRestSeconds={structure.workout.defaultRestSeconds}
         blocks={structure.blocks.map((b) => ({
           id: b.id,
@@ -47,8 +52,9 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
     );
   }
 
-  // Finished: summary view.
-  const durationSeconds = (session.finishedAt.getTime() - session.startedAt.getTime()) / 1000;
+  // Finished: summary view. Time spent paused doesn't count as workout time.
+  const durationSeconds =
+    (session.finishedAt.getTime() - session.startedAt.getTime() - session.pausedMs) / 1000;
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pb-10 pt-6">

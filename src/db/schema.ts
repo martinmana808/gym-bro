@@ -89,6 +89,10 @@ export const sessions = pgTable("sessions", {
   // the page, reloading, or closing the app — and so the active-session bar
   // can show it from anywhere. Null when not resting.
   restEndsAt: timestamp("rest_ends_at", { withTimezone: true }),
+  // Pause: `pausedAt` is set while paused, `pausedMs` accumulates time already
+  // spent paused. Elapsed = now - startedAt - pausedMs - (now - pausedAt).
+  pausedAt: timestamp("paused_at", { withTimezone: true }),
+  pausedMs: integer("paused_ms").notNull().default(0),
 });
 
 export const setLogs = pgTable(

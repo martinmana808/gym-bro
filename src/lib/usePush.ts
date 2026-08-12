@@ -189,3 +189,18 @@ export async function clearRestOnServer(sessionId?: string) {
     });
   } catch {}
 }
+
+/** Pause or resume the session clock. Returns the (shifted) rest end time. */
+export async function setSessionPaused(sessionId: string, paused: boolean) {
+  try {
+    const res = await fetch("/api/session/pause", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ sessionId, paused }),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as { paused: boolean; restEndsAtMs: number | null };
+  } catch {
+    return null;
+  }
+}

@@ -36,6 +36,13 @@
       "when": 1786511242873,
       "tag": "0004_loving_jack_power",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1786557350145,
+      "tag": "0005_third_demogoblin",
+      "breakpoints": true
     }
   ]
 }

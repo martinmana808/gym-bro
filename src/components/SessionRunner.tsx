@@ -19,7 +19,14 @@ import { NumberSelect } from "@/components/NumberSelect";
 import { SetGrid } from "@/components/SetGrid";
 import { useWakeLock } from "@/lib/useWakeLock";
 import { primeAudio, restAlert } from "@/lib/restAlert";
-import { clearRestOnServer, startRestOnServer } from "@/lib/usePush";
+import { clearRestOnServer, setSessionPaused, startRestOnServer } from "@/lib/usePush";
+import { activeSessionView, sessionElapsedSeconds } from "@/lib/activeSession";
+import {
+  PauseButton,
+  SessionWidget,
+  SetsButton,
+  StopButton,
+} from "@/components/SessionWidget";
 
 export type LogEntry = SetEntry;
 
@@ -32,8 +39,13 @@ export function SessionRunner({
   programId,
   workoutId,
   workoutName,
+  programName,
+  weekName,
+  weekCount,
   startedAtMs,
   restEndsAtMs,
+  initialPausedAtMs,
+  initialPausedMs,
   defaultRestSeconds,
   blocks,
   initialLogs,
@@ -44,8 +56,13 @@ export function SessionRunner({
   programId: string;
   workoutId: string;
   workoutName: string;
+  programName: string;
+  weekName: string;
+  weekCount: number;
   startedAtMs: number;
   restEndsAtMs: number | null;
+  initialPausedAtMs: number | null;
+  initialPausedMs: number;
   defaultRestSeconds: number;
   blocks: RunnerBlock[];
   initialLogs: LogEntry[];
@@ -88,6 +105,9 @@ export function SessionRunner({
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showGrid, setShowGrid] = useState(false);
+  const [pausedAtMs, setPausedAtMs] = useState<number | null>(initialPausedAtMs);
+  const [pausedMs, setPausedMs] = useState(initialPausedMs);
+  const [pausing, setPausing] = useState(false);
 
   const step = setSteps[setIndex];
 
@@ -221,13 +241,88 @@ export function SessionRunner({
     }
   };
 
-  const elapsed = formatClock((now - startedAtMs) / 1000);
-  const loggedCount = logs.size;
+  const paused = pausedAtMs != null;
+  const elapsed = formatClock(sessionElapsedSeconds({ startedAtMs, pausedAtMs, pausedMs }, now));
+
+  // Same shape the other pages render, but fed from live local state so it
+  // updates the instant a set is logged rather than after a refetch.
+  const widgetView = activeSessionView(
+    {
+      dayName: workoutName,
+      programName,
+      weekName,
+      weekCount,
+      restEndsAtMs: resting?.endsAt ?? null,
+      startedAtMs,
+      pausedAtMs,
+      pausedMs,
+      steps: setSteps.map((s) => ({
+        exerciseId: s.exercise.id,
+        exerciseName: s.exercise.name,
+        setNumber: s.setNumber,
+        rounds: s.rounds,
+      })),
+      loggedKeys: [...logs.keys()],
+    },
+    now,
+  );
+
+  const togglePause = async () => {
+    setPausing(true);
+    const next = !paused;
+    // Optimistic: the clock should stop the instant you tap.
+    if (next) {
+      setPausedAtMs(Date.now());
+      setResting((r) => r); // keep whatever rest we had; the server shifts its end
+    }
+    const res = await setSessionPaused(sessionId, next);
+    if (res) {
+      if (res.paused) {
+        setPausedAtMs((cur) => cur ?? Date.now());
+      } else {
+        // Server shifted rest_ends_at forward by however long we were paused.
+        setPausedMs((ms) => ms + (pausedAtMs ? Date.now() - pausedAtMs : 0));
+        setPausedAtMs(null);
+        if (res.restEndsAtMs && res.restEndsAtMs > Date.now()) {
+          const secs = Math.ceil((res.restEndsAtMs - Date.now()) / 1000);
+          setResting({ endsAt: res.restEndsAtMs, total: resting?.total ?? secs });
+          // Re-arm the push that pausing dropped.
+          void startRestOnServer({
+            seconds: secs,
+            nextExercise: step?.exercise.name ?? null,
+            sessionId,
+          });
+        } else {
+          setResting(null);
+        }
+      }
+    } else {
+      setPausedAtMs(paused ? pausedAtMs : null); // request failed — put it back
+      setError("Could not " + (next ? "pause" : "resume") + " — try again.");
+    }
+    setPausing(false);
+  };
   const prev = step ? prevMap.get(logKey(step.exercise.id, step.setNumber)) : undefined;
 
   return (
     <>
-      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-[8.5rem] pt-4">
+      <div className="mx-auto flex w-full max-w-md flex-1 flex-col px-4 pb-[7.5rem] pt-4">
+        <div className="flex items-center gap-3 pb-2">
+          <Link
+            href={`/workouts/${programId}/days/${workoutId}`}
+            aria-label="Leave session — your progress is saved"
+            title="Leave session — your progress is saved"
+            className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+          >
+            ←
+          </Link>
+          {/* The widget below has no room for these, but they're worth keeping. */}
+          <p className="text-sm text-zinc-500">
+            <span className="tabular-nums">{elapsed}</span>
+            {paused && <span className="text-zinc-400"> · paused</span>} · {logs.size}/
+            {setSteps.length} sets
+          </p>
+        </div>
       {isResting && resting ? (
         <RestScreen
           remaining={restRemaining}
@@ -442,48 +537,19 @@ export function SessionRunner({
       )}
       </div>
 
-      {/* Session controls live at the bottom, in the same place the "session in
-          progress" bar sits on every other page — so moving between them
-          doesn't make the workout summary jump from bottom to top. */}
+      {/* The same widget every other page shows, so nothing jumps when you
+          move in and out of the session — only the controls differ. */}
       <div className="fixed inset-x-0 bottom-0 z-40 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        <div className="mx-auto w-full max-w-md overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/95 shadow-lg shadow-black/40 backdrop-blur">
-          <div className="h-1 w-full bg-zinc-800/80">
-            <div
-              className="h-full bg-lime-400 transition-all duration-500"
-              style={{ width: `${(loggedCount / Math.max(1, setSteps.length)) * 100}%` }}
-            />
-          </div>
-          <header className="flex items-center gap-3 px-3 py-2.5">
-            <Link
-              href={`/workouts/${programId}/days/${workoutId}`}
-              aria-label="Leave session — your progress is saved"
-              title="Leave session — your progress is saved"
-              className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-950/60 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
-            >
-              ←
-            </Link>
-            <div className="min-w-0 flex-1">
-              <h1 className="truncate font-semibold tracking-tight">{workoutName}</h1>
-              <p className="text-sm text-zinc-400">
-                <span className="tabular-nums">{elapsed}</span> · {loggedCount}/{setSteps.length} sets
-              </p>
-            </div>
-            <button
-              onClick={() => setShowGrid(true)}
-              aria-label="Show all sets"
-              className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-950/60 text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
-            >
-              ▦
-            </button>
-            <button
-              onClick={finish}
-              disabled={finishing || discarding}
-              className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-lime-400 hover:text-lime-400 disabled:opacity-50"
-            >
-              {finishing ? "Finishing…" : "Finish"}
-            </button>
-          </header>
-        </div>
+        <SessionWidget
+          view={widgetView}
+          trailing={
+            <span className="flex shrink-0 items-center gap-1.5">
+              <SetsButton onClick={() => setShowGrid(true)} />
+              <PauseButton paused={paused} onClick={togglePause} disabled={pausing || finishing} />
+              <StopButton onClick={finish} disabled={finishing || discarding} />
+            </span>
+          }
+        />
       </div>
     </>
   );
