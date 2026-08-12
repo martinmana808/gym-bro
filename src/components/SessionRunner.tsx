@@ -439,7 +439,8 @@ export function SessionRunner({
 
       {showGrid && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/95 backdrop-blur">
-          <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 py-6 pb-[max(2rem,env(safe-area-inset-bottom))]">
+          {/* Fixed overlays sit outside <body>'s padding, so they carry their own inset. */}
+          <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
             <header className="flex items-center justify-between">
               <h2 className="font-semibold tracking-tight">All sets</h2>
               <button

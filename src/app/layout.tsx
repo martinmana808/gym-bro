@@ -38,7 +38,10 @@ export default function RootLayout({
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="flex min-h-full flex-col text-zinc-100">
+      {/* Installed on iOS there is no browser chrome, and viewportFit:"cover"
+          lets us draw under the status bar — so every page needs the top inset
+          or the first row of controls sits beneath the clock. */}
+      <body className="flex min-h-full flex-col pt-[env(safe-area-inset-top)] text-zinc-100">
         <ServiceWorkerRegistrar />
         {children}
       </body>
