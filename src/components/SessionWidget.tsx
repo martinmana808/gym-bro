@@ -38,30 +38,34 @@ export function SessionWidget({
           style={{ width: `${Math.round(view.progress * 100)}%` }}
         />
       </div>
-      <div className="flex items-center gap-2.5 py-2.5 pl-3 pr-2">
-        <span className={`h-9 w-1 shrink-0 rounded-full ${accent.bar}`} />
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[0.7rem] font-medium uppercase tracking-[0.06em] text-zinc-500">
+      <div className="flex items-stretch">
+        <span className={`w-1 shrink-0 ${accent.bar}`} />
+        {/* The label gets its own full-width row: sharing one with three
+            buttons clipped even short workout names. */}
+        <div className="min-w-0 flex-1 py-2 pl-2.5 pr-2">
+          <p className="truncate text-[0.7rem] font-medium uppercase tracking-[0.06em] text-zinc-500">
             {view.label}
-          </span>
-          <span className="mt-0.5 flex items-baseline gap-2">
-            <span className="truncate font-semibold tracking-tight text-zinc-100">
-              {view.primary}
-            </span>
-            <span className={`shrink-0 text-xs ${accent.text}`}>{view.detail}</span>
-          </span>
-        </span>
+          </p>
+          <div className="mt-0.5 flex items-center gap-2.5">
+            <p className="flex min-w-0 flex-1 items-baseline gap-2">
+              <span className="truncate font-semibold tracking-tight text-zinc-100">
+                {view.primary}
+              </span>
+              <span className={`shrink-0 text-xs ${accent.text}`}>{view.detail}</span>
+            </p>
 
-        {/* Rest countdown when one is running, otherwise a pulse saying "live". */}
-        {view.secondsLeft != null ? (
-          <span className={`shrink-0 text-xl font-bold tabular-nums ${accent.text}`}>
-            {formatClock(view.secondsLeft)}
-          </span>
-        ) : (
-          <ActivityDot mode={view.mode} className={accent.text} />
-        )}
+            {/* Rest countdown when one is running, otherwise a "live" spinner. */}
+            {view.secondsLeft != null ? (
+              <span className={`shrink-0 text-xl font-bold tabular-nums ${accent.text}`}>
+                {formatClock(view.secondsLeft)}
+              </span>
+            ) : (
+              <ActivityDot mode={view.mode} className={accent.text} />
+            )}
 
-        {trailing}
+            {trailing}
+          </div>
+        </div>
       </div>
     </div>
   );
