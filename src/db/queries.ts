@@ -9,7 +9,7 @@ import {
   groupExercisesIntoBlocks,
   type SetStep,
 } from "@/lib/workout";
-import type { ActiveSessionInput } from "@/lib/activeSession";
+import { formatStepTarget, type ActiveSessionInput } from "@/lib/activeSession";
 import { deriveWeeks, missingCells, type WeekCol } from "@/lib/weeks";
 import { buildSheetRows, type SheetRow, type SheetWeekMeta } from "@/lib/sheet";
 
@@ -235,10 +235,6 @@ export type SessionData = {
   logs: SetLog[];
   previousLogs: SetLog[];
   notes: SessionNote[];
-  /** For the session widget's label, so it matches the one on other pages. */
-  programName: string;
-  weekName: string;
-  weekCount: number;
 };
 
 export async function getSessionData(
@@ -270,22 +266,7 @@ export async function getSessionData(
   const notes = await db.query.sessionNotes.findMany({
     where: eq(schema.sessionNotes.sessionId, sessionId),
   });
-  const program = await db.query.programs.findFirst({
-    where: eq(schema.programs.id, structure.workout.programId),
-  });
-  const weeks = await db.query.variations.findMany({
-    where: eq(schema.variations.dayId, structure.workout.id),
-  });
-  return {
-    session,
-    structure,
-    logs,
-    previousLogs,
-    notes,
-    programName: program?.name ?? "",
-    weekName: structure.variation.name,
-    weekCount: weeks.length,
-  };
+  return { session, structure, logs, previousLogs, notes };
 }
 
 /** Insert-only: pad any missing (day, position) cell in a program with an empty
@@ -583,12 +564,6 @@ export async function getActiveSession(userId: string): Promise<ActiveSessionSum
   const structure = await getVariationStructure(session.variationId, userId);
   if (!structure) return null;
 
-  const variations = await db.query.variations.findMany({
-    where: eq(schema.variations.dayId, structure.workout.id),
-  });
-  const program = await db.query.programs.findFirst({
-    where: eq(schema.programs.id, structure.workout.programId),
-  });
   const logs = await db.query.setLogs.findMany({
     where: eq(schema.setLogs.sessionId, session.id),
   });
@@ -603,16 +578,14 @@ export async function getActiveSession(userId: string): Promise<ActiveSessionSum
       exerciseName: s.exercise.name,
       setNumber: s.setNumber,
       rounds: s.rounds,
+      blockSize: s.blockSize,
+      targetLabel: formatStepTarget(s.exercise),
     }));
 
   return {
     sessionId: session.id,
     programId: structure.workout.programId,
     dayId: structure.workout.id,
-    dayName: structure.workout.name,
-    programName: program?.name ?? "",
-    weekName: structure.variation.name,
-    weekCount: variations.length,
     restEndsAtMs: session.restEndsAt ? session.restEndsAt.getTime() : null,
     startedAtMs: session.startedAt.getTime(),
     pausedAtMs: session.pausedAt ? session.pausedAt.getTime() : null,

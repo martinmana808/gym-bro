@@ -4,6 +4,7 @@ import { requireUserId } from "@/auth";
 import { getDayCellVariationId, getVariationStructure, listDayVariations } from "@/db/queries";
 import { deriveWeeks } from "@/lib/weeks";
 import { WorkoutBuilder } from "@/components/WorkoutBuilder";
+import { WeekTargetsEditor } from "@/components/WeekTargetsEditor";
 import { WeekTabs } from "@/components/WeekTabs";
 
 export const dynamic = "force-dynamic";
@@ -31,6 +32,9 @@ export default async function EditCellPage({
   const structure = await getVariationStructure(cellVariationId, userId);
   if (!structure) notFound();
   const { workout, blocks } = structure;
+  // The first week owns the exercise list; later weeks are progressions of it,
+  // so they only get to move the numbers.
+  const isFirstWeek = selectedWeek === weeks[0].position;
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 py-6">
@@ -43,7 +47,9 @@ export default async function EditCellPage({
           ←
         </Link>
         <div className="min-w-0">
-          <h1 className="text-2xl font-bold tracking-tight">Edit day</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            {isFirstWeek ? "Edit day" : "Edit week"}
+          </h1>
           <p className="truncate text-sm text-zinc-400">
             {workout.name} · <span className="text-lime-400">{weeks.find((w) => w.position === selectedWeek)?.name}</span>
           </p>
@@ -57,32 +63,54 @@ export default async function EditCellPage({
         basePath={`/workouts/${programId}/days/${dayId}/edit`}
       />
 
-      <WorkoutBuilder
-        variationId={cellVariationId}
-        nameLabel="Day name"
-        initial={{
-          name: workout.name,
-          defaultRestSeconds: workout.defaultRestSeconds,
-          blocks: blocks.map((b) => ({
+      {isFirstWeek ? (
+        <WorkoutBuilder
+          variationId={cellVariationId}
+          nameLabel="Day name"
+          initial={{
+            name: workout.name,
+            defaultRestSeconds: workout.defaultRestSeconds,
+            blocks: blocks.map((b) => ({
+              id: b.id,
+              sectionName: b.exercises[0]?.sectionName ?? null,
+              exercises: b.exercises.map((e) => ({
+                id: e.id,
+                name: e.name,
+                sets: e.sets,
+                measurement: e.measurement,
+                repScheme: e.repScheme,
+                repsMin: e.repsMin,
+                repsMax: e.repsMax,
+                timeSeconds: e.timeSeconds,
+                restOverrideSeconds: e.restOverrideSeconds,
+                note: e.note,
+                weightUnit: e.weightUnit,
+                targetWeight: e.targetWeight,
+              })),
+            })),
+          }}
+        />
+      ) : (
+        <WeekTargetsEditor
+          variationId={cellVariationId}
+          blocks={blocks.map((b) => ({
             id: b.id,
-            sectionName: b.exercises[0]?.sectionName ?? null,
             exercises: b.exercises.map((e) => ({
               id: e.id,
               name: e.name,
-              sets: e.sets,
+              sectionName: e.sectionName,
               measurement: e.measurement,
               repScheme: e.repScheme,
+              sets: e.sets,
               repsMin: e.repsMin,
               repsMax: e.repsMax,
               timeSeconds: e.timeSeconds,
-              restOverrideSeconds: e.restOverrideSeconds,
-              note: e.note,
               weightUnit: e.weightUnit,
               targetWeight: e.targetWeight,
             })),
-          })),
-        }}
-      />
+          }))}
+        />
+      )}
     </main>
   );
 }

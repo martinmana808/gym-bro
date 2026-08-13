@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteSession, finishSession, logSet, saveSessionNote } from "@/app/actions";
@@ -20,7 +20,12 @@ import { SetGrid } from "@/components/SetGrid";
 import { useWakeLock } from "@/lib/useWakeLock";
 import { primeAudio, restAlert } from "@/lib/restAlert";
 import { clearRestOnServer, setSessionPaused, startRestOnServer } from "@/lib/usePush";
-import { activeSessionView, sessionElapsedSeconds } from "@/lib/activeSession";
+import {
+  activeSessionView,
+  formatStepTarget,
+  hitsTarget,
+  sessionElapsedSeconds,
+} from "@/lib/activeSession";
 import {
   PauseButton,
   SessionWidget,
@@ -38,10 +43,6 @@ export function SessionRunner({
   sessionId,
   programId,
   workoutId,
-  workoutName,
-  programName,
-  weekName,
-  weekCount,
   startedAtMs,
   restEndsAtMs,
   initialPausedAtMs,
@@ -55,10 +56,6 @@ export function SessionRunner({
   sessionId: string;
   programId: string;
   workoutId: string;
-  workoutName: string;
-  programName: string;
-  weekName: string;
-  weekCount: number;
   startedAtMs: number;
   restEndsAtMs: number | null;
   initialPausedAtMs: number | null;
@@ -170,10 +167,13 @@ export function SessionRunner({
     }
   }, [resting, restRemaining, sessionId]);
 
-  const startRest = (seconds: number, nextExercise: string | null) => {
-    setResting({ endsAt: Date.now() + seconds * 1000, total: seconds });
-    void startRestOnServer({ seconds, nextExercise, sessionId });
-  };
+  const startRest = useCallback(
+    (seconds: number, nextExercise: string | null) => {
+      setResting({ endsAt: Date.now() + seconds * 1000, total: seconds });
+      void startRestOnServer({ seconds, nextExercise, sessionId });
+    },
+    [sessionId],
+  );
 
   const stopRest = () => {
     setResting(null);
@@ -191,8 +191,11 @@ export function SessionRunner({
       weight: weight === "" ? null : Number(weight),
       reps: isTime ? null : repsValue,
       timeSeconds: isTime && seconds !== "" ? Number(seconds) : null,
-      hitTarget: over?.ok ?? false,
+      hitTarget: false,
     };
+    // The form is pre-filled with the target, so logging it unchanged is what
+    // the old OK button used to mean — mark it rather than asking.
+    entry.hitTarget = hitsTarget(step.exercise, entry);
     setSaving(true);
     setError(null);
     try {
@@ -248,10 +251,6 @@ export function SessionRunner({
   // updates the instant a set is logged rather than after a refetch.
   const widgetView = activeSessionView(
     {
-      dayName: workoutName,
-      programName,
-      weekName,
-      weekCount,
       restEndsAtMs: resting?.endsAt ?? null,
       startedAtMs,
       pausedAtMs,
@@ -261,6 +260,8 @@ export function SessionRunner({
         exerciseName: s.exercise.name,
         setNumber: s.setNumber,
         rounds: s.rounds,
+        blockSize: s.blockSize,
+        targetLabel: formatStepTarget(s.exercise),
       })),
       loggedKeys: [...logs.keys()],
     },
@@ -432,16 +433,6 @@ export function SessionRunner({
 
           {step.exercise.measurement === "reps" && (
             <div className="flex flex-wrap gap-2">
-              {step.exercise.repScheme === "fixed" && step.exercise.repsMin != null && (
-                <button
-                  type="button"
-                  onClick={() => submitSet({ reps: step.exercise.repsMin!, ok: true })}
-                  disabled={saving}
-                  className="rounded-xl bg-lime-400/15 px-4 py-2 text-sm font-semibold text-lime-400 transition hover:bg-lime-400/25 disabled:opacity-50"
-                >
-                  OK ({step.exercise.repsMin})
-                </button>
-              )}
               {step.exercise.repScheme === "range" &&
                 step.exercise.repsMin != null &&
                 step.exercise.repsMax != null &&
@@ -469,7 +460,7 @@ export function SessionRunner({
           <button
             onClick={() => submitSet()}
             disabled={saving || discarding}
-            className="rounded-2xl bg-lime-400 py-4 text-lg font-bold text-zinc-950 shadow-lg shadow-lime-400/20 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
+            className="rounded-2xl bg-lime-400/15 py-4 text-lg font-bold text-lime-400 transition hover:bg-lime-400/25 active:scale-[0.98] disabled:opacity-50"
           >
             {saving ? "Saving…" : "Log set"}
           </button>
@@ -504,9 +495,9 @@ export function SessionRunner({
       )}
 
       {showGrid && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-zinc-950/95 backdrop-blur">
+        <div className="fixed inset-0 z-30 overflow-y-auto bg-zinc-950/95 backdrop-blur">
           {/* Fixed overlays sit outside <body>'s padding, so they carry their own inset. */}
-          <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(1.5rem,env(safe-area-inset-top))]">
+          <div className="mx-auto flex w-full max-w-md flex-col gap-4 px-4 pb-[8.75rem] pt-[max(1.5rem,env(safe-area-inset-top))]">
             <header className="flex items-center justify-between">
               <h2 className="font-semibold tracking-tight">All sets</h2>
               <button
@@ -544,7 +535,7 @@ export function SessionRunner({
           view={widgetView}
           trailing={
             <span className="flex shrink-0 items-center gap-1.5">
-              <SetsButton onClick={() => setShowGrid(true)} />
+              <SetsButton open={showGrid} onClick={() => setShowGrid((v) => !v)} />
               <PauseButton paused={paused} onClick={togglePause} disabled={pausing || finishing} />
               <StopButton onClick={finish} disabled={finishing || discarding} />
             </span>

@@ -15,7 +15,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const userId = await requireUserId();
   const data = await getSessionData(id, userId);
   if (!data) notFound();
-  const { session, structure, logs, previousLogs, notes, programName, weekName, weekCount } = data;
+  const { session, structure, logs, previousLogs, notes } = data;
 
   const toEntry = (l: (typeof logs)[number]): LogEntry => ({
     exerciseId: l.exerciseId,
@@ -32,14 +32,10 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         sessionId={session.id}
         programId={structure.workout.programId}
         workoutId={structure.workout.id}
-        workoutName={structure.workout.name}
         startedAtMs={session.startedAt.getTime()}
         restEndsAtMs={session.restEndsAt ? session.restEndsAt.getTime() : null}
         initialPausedAtMs={session.pausedAt ? session.pausedAt.getTime() : null}
         initialPausedMs={session.pausedMs}
-        programName={programName}
-        weekName={weekName}
-        weekCount={weekCount}
         defaultRestSeconds={structure.workout.defaultRestSeconds}
         blocks={structure.blocks.map((b) => ({
           id: b.id,

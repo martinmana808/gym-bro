@@ -71,7 +71,11 @@ export function ActiveSessionBar() {
         >
           <SessionWidget
             view={activeSessionView(active, now)}
-            trailing={<span className="shrink-0 pl-1 pr-1 text-lg text-zinc-600">›</span>}
+            trailing={
+              <span className="grid size-11 shrink-0 place-items-center text-2xl text-zinc-500">
+                ›
+              </span>
+            }
           />
         </Link>
       </div>

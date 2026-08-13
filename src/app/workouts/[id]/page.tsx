@@ -34,16 +34,15 @@ export default async function WorkoutHubPage({
         >
           ←
         </Link>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <h1 className="truncate text-2xl font-bold tracking-tight">{hub.program.name}</h1>
           <p className="text-sm text-zinc-400">
             {hub.days.length} day{hub.days.length === 1 ? "" : "s"} · {hub.weeks.length} week
             {hub.weeks.length === 1 ? "" : "s"}
           </p>
         </div>
+        <HubActions programId={hub.program.id} name={hub.program.name} />
       </header>
-
-      <HubActions programId={hub.program.id} name={hub.program.name} />
 
       <Link
         href={`/workouts/${hub.program.id}/sheet`}

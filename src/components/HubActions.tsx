@@ -3,37 +3,51 @@
 import { useState } from "react";
 import { renameProgram, duplicateProgram } from "@/app/actions";
 
+/**
+ * The workout-level Edit, mirroring the day screen's: a button top-right that
+ * opens renaming, with the other workout-wide actions alongside it rather than
+ * loose on the page.
+ */
 export function HubActions({ programId, name }: { programId: string; name: string }) {
-  const [renaming, setRenaming] = useState(false);
+  const [open, setOpen] = useState(false);
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="shrink-0 rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-500"
+      >
+        Edit
+      </button>
+    );
+  }
+
   return (
-    <div className="flex flex-wrap items-center gap-4 text-sm">
-      {renaming ? (
-        <form
-          action={async (fd: FormData) => {
-            await renameProgram(programId, String(fd.get("name") ?? ""));
-            setRenaming(false);
-          }}
-          className="flex items-center gap-2"
-        >
-          <input
-            name="name"
-            defaultValue={name}
-            autoFocus
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-zinc-100 focus:border-lime-400 focus:outline-none"
-          />
-          <button className="text-lime-400">Save</button>
-        </form>
-      ) : (
-        <button
-          onClick={() => setRenaming(true)}
-          className="text-zinc-400 transition hover:text-zinc-200"
-        >
-          Rename workout
-        </button>
-      )}
-      <form action={duplicateProgram.bind(null, programId)}>
-        <button className="text-zinc-400 transition hover:text-lime-400">Duplicate workout</button>
+    <div className="flex flex-col items-end gap-2">
+      <form
+        action={async (fd: FormData) => {
+          await renameProgram(programId, String(fd.get("name") ?? ""));
+          setOpen(false);
+        }}
+        className="flex items-center gap-2"
+      >
+        <input
+          name="name"
+          defaultValue={name}
+          autoFocus
+          aria-label="Workout name"
+          className="w-40 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-sm text-zinc-100 focus:border-lime-400 focus:outline-none"
+        />
+        <button className="text-sm font-medium text-lime-400">Save</button>
       </form>
+      <div className="flex items-center gap-3 text-xs text-zinc-500">
+        <form action={duplicateProgram.bind(null, programId)}>
+          <button className="transition hover:text-lime-400">Duplicate</button>
+        </form>
+        <button onClick={() => setOpen(false)} className="transition hover:text-zinc-300">
+          Cancel
+        </button>
+      </div>
     </div>
   );
 }

@@ -719,3 +719,62 @@ export async function duplicateProgram(programId: string) {
   revalidatePath("/workouts");
   redirect(`/workouts/${newProgramId}`);
 }
+
+export type TargetEdit = {
+  exerciseId: string;
+  sets: number;
+  targetWeight: number | null;
+  repsMin: number | null;
+  repsMax: number | null;
+  timeSeconds: number | null;
+};
+
+/**
+ * Update only the numbers of an existing week: sets, weight, reps.
+ *
+ * Later weeks are progressions of the first — almost always the same exercises
+ * with different loads — so their editor can't add, remove, rename or reorder
+ * anything. Only rows that already belong to this variation are touched, so a
+ * stale form can't inject exercises from elsewhere. Structural edits to a
+ * copied week are a later step.
+ */
+export async function updateVariationTargets(variationId: string, edits: TargetEdit[]) {
+  const userId = await requireUserId();
+  const variation = await ownedVariation(variationId, userId);
+  const db = await getDb();
+
+  const existing = await db.query.exercises.findMany({
+    where: eq(schema.exercises.variationId, variationId),
+  });
+  const byId = new Map(existing.map((e) => [e.id, e]));
+
+  for (const edit of edits) {
+    const row = byId.get(edit.exerciseId);
+    if (!row) continue; // not part of this week — ignore rather than trust the form
+    const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, Math.round(n)));
+    const isTime = row.measurement === "time";
+    const repsMin =
+      isTime || row.repScheme === "failure" || edit.repsMin == null
+        ? null
+        : clamp(edit.repsMin, 1, 999);
+    const repsMax =
+      row.repScheme === "range" && edit.repsMax != null ? clamp(edit.repsMax, 1, 999) : null;
+    await db
+      .update(schema.exercises)
+      .set({
+        sets: clamp(edit.sets, 1, 20),
+        targetWeight:
+          edit.targetWeight == null ? null : Math.max(0, Math.min(999, edit.targetWeight)),
+        repsMin: isTime ? null : repsMin,
+        // Keep a range the right way round even if the two wheels crossed over.
+        repsMax: repsMax != null && repsMin != null ? Math.max(repsMin, repsMax) : repsMax,
+        timeSeconds: isTime && edit.timeSeconds != null ? clamp(edit.timeSeconds, 1, 3600) : row.timeSeconds,
+      })
+      .where(eq(schema.exercises.id, row.id));
+  }
+
+  const day = await db.query.days.findFirst({ where: eq(schema.days.id, variation.dayId) });
+  revalidatePath("/workouts");
+  revalidatePath(`/workouts/${day!.programId}`);
+  redirect(`/workouts/${day!.programId}/days/${variation.dayId}?week=${variation.position}`);
+}

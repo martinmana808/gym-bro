@@ -119,25 +119,21 @@ export default async function DayDetailPage({
       )}
 
       <section>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">Plan</h2>
         <div className="flex flex-col gap-3">
           {blocks.map((block, i) => {
             const section = block.exercises[0]?.sectionName ?? null;
             const prevSection = i > 0 ? (blocks[i - 1].exercises[0]?.sectionName ?? null) : null;
             const showHeader = section && section !== prevSection;
             return (
-              <div key={block.id} className="flex flex-col gap-1">
+              <div key={block.id} className="flex flex-col">
+                {/* Same left padding as the cards below, so the whole plan
+                    column lines up whether or not a block is a superset. */}
                 {showHeader && (
-                  <p className="mt-2 border-l-2 border-lime-400 pl-2 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
+                  <p className="mb-2.5 mt-2 pl-4 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
                     {section}
                   </p>
                 )}
                 <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4">
-                  {block.exercises.length > 1 && (
-                    <p className="mb-1.5 text-[11px] font-medium uppercase tracking-wider text-zinc-500">
-                      {blockLabel(block.exercises.length)}
-                    </p>
-                  )}
                   {block.exercises.map((e) => (
                     <div key={e.id} className="flex items-baseline justify-between gap-3 py-1">
                       <span className="font-medium">{e.name}</span>
