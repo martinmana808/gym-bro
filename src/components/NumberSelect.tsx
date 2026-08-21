@@ -5,8 +5,8 @@ import { numberOptions } from "@/lib/workout";
 import { WheelPicker } from "@/components/WheelPicker";
 
 const selectField =
-  "w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2.5 text-left text-zinc-100 " +
-  "transition focus:border-lime-400 focus:outline-none";
+  "w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-left text-zinc-900 " +
+  "transition focus:border-lime-500 focus:outline-none";
 
 /**
  * A number field that opens an iOS-style wheel picker. (A native <select> is no

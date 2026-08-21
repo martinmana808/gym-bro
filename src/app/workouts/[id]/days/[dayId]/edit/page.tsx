@@ -5,6 +5,8 @@ import { getDayCellVariationId, getVariationStructure, listDayVariations } from 
 import { deriveWeeks } from "@/lib/weeks";
 import { WorkoutBuilder } from "@/components/WorkoutBuilder";
 import { WeekTargetsEditor } from "@/components/WeekTargetsEditor";
+import { ConfirmSubmit } from "@/components/ConfirmSubmit";
+import { deleteDay } from "@/app/actions";
 import { WeekTabs } from "@/components/WeekTabs";
 
 export const dynamic = "force-dynamic";
@@ -37,12 +39,12 @@ export default async function EditCellPage({
   const isFirstWeek = selectedWeek === weeks[0].position;
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 py-6">
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pt-6">
       <header className="flex items-center gap-3">
         <Link
           href={`/workouts/${programId}/days/${dayId}?week=${selectedWeek}`}
           aria-label="Back to day"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-lg text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-900"
         >
           ←
         </Link>
@@ -50,8 +52,8 @@ export default async function EditCellPage({
           <h1 className="text-2xl font-bold tracking-tight">
             {isFirstWeek ? "Edit day" : "Edit week"}
           </h1>
-          <p className="truncate text-sm text-zinc-400">
-            {workout.name} · <span className="text-lime-400">{weeks.find((w) => w.position === selectedWeek)?.name}</span>
+          <p className="truncate text-sm text-zinc-500">
+            {workout.name} · <span className="text-lime-600">{weeks.find((w) => w.position === selectedWeek)?.name}</span>
           </p>
         </div>
       </header>
@@ -110,6 +112,18 @@ export default async function EditCellPage({
             })),
           }))}
         />
+      )}
+      {/* The day cards no longer carry a bin — deleting one lives here, with
+          the rest of its structural edits. */}
+      {isFirstWeek && (
+        <form action={deleteDay.bind(null, dayId)} className="mt-2 text-center">
+          <ConfirmSubmit
+            message={`Delete "${workout.name}" and all its weeks and sessions? This cannot be undone.`}
+            className="text-sm text-zinc-400 transition hover:text-red-600"
+          >
+            Delete day
+          </ConfirmSubmit>
+        </form>
       )}
     </main>
   );

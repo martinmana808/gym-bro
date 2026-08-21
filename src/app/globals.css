@@ -5,15 +5,15 @@
   --font-mono: var(--font-geist-mono);
 }
 
-/* The app is dark-only: keep native form controls, scrollbars and
+/* The app is light-only: keep native form controls, scrollbars and
    autofill consistent regardless of the device's color scheme. */
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 body {
-  background-color: #09090b;
-  background-image: radial-gradient(65rem 45rem at 50% -12rem, rgb(163 230 53 / 0.06), transparent 70%);
+  background-color: #fafafa;
+  background-image: radial-gradient(65rem 45rem at 50% -12rem, rgb(132 204 22 / 0.10), transparent 70%);
   background-repeat: no-repeat;
 }
 

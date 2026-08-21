@@ -31,9 +31,9 @@ export function SetGrid({
       {blocks
         .filter((b) => b.exercises.length > 0)
         .map((block) => (
-          <div key={block.id} className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-3">
+          <div key={block.id} className="rounded-2xl border border-zinc-200 bg-white p-3">
             {block.exercises.length > 1 && (
-              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
+              <p className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.15em] text-lime-600">
                 {blockLabel(block.exercises.length)}
               </p>
             )}
@@ -52,10 +52,10 @@ export function SetGrid({
                         onClick={() => onCellTap(e.id, setNumber)}
                         className={`min-w-14 rounded-lg border px-2 py-2 text-center text-sm tabular-nums transition ${
                           active
-                            ? "border-lime-400 text-lime-400"
+                            ? "border-lime-500 text-lime-600"
                             : entry
-                              ? "border-zinc-700 bg-zinc-800/60 text-zinc-100"
-                              : "border-zinc-800 text-zinc-600"
+                              ? "border-zinc-300 bg-zinc-800/60 text-zinc-900"
+                              : "border-zinc-200 text-zinc-400"
                         }`}
                       >
                         {entry

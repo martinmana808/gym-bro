@@ -25,31 +25,20 @@ export default async function WorkoutHubPage({
   if (!hub) notFound();
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pb-10 pt-6">
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pt-6">
       <header className="flex items-center gap-3">
         <Link
           href="/workouts"
           aria-label="Back to workouts"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-lg text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-900"
         >
           ←
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-2xl font-bold tracking-tight">{hub.program.name}</h1>
-          <p className="text-sm text-zinc-400">
-            {hub.days.length} day{hub.days.length === 1 ? "" : "s"} · {hub.weeks.length} week
-            {hub.weeks.length === 1 ? "" : "s"}
-          </p>
         </div>
         <HubActions programId={hub.program.id} name={hub.program.name} />
       </header>
-
-      <Link
-        href={`/workouts/${hub.program.id}/sheet`}
-        className="text-center text-sm text-zinc-400 underline underline-offset-2 transition hover:text-lime-400"
-      >
-        📊 Spreadsheet view — all weeks &amp; sessions
-      </Link>
 
       <WeekTabs
         programId={hub.program.id}
@@ -65,10 +54,17 @@ export default async function WorkoutHubPage({
         lastDoneDayId={hub.lastDoneDayId}
       />
 
-      <form action={deleteProgram.bind(null, hub.program.id)} className="mt-4 text-center">
+      <Link
+        href={`/workouts/${hub.program.id}/sheet`}
+        className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-600 transition hover:border-zinc-300"
+      >
+        📊 Spreadsheet view — all weeks &amp; sessions
+      </Link>
+
+      <form action={deleteProgram.bind(null, hub.program.id)} className="mt-2 text-center">
         <ConfirmSubmit
           message={`Delete the whole "${hub.program.name}" workout — every day, week and session? This cannot be undone.`}
-          className="text-sm text-zinc-600 transition hover:text-red-400"
+          className="text-sm text-zinc-400 transition hover:text-red-600"
         >
           Delete workout
         </ConfirmSubmit>

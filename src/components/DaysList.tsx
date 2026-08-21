@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { addDay, renameDay, deleteDay, startSession } from "@/app/actions";
+import { addDay, startSession } from "@/app/actions";
 import type { HubDay } from "@/db/queries";
 
 /** Hub list of days for the selected week. Each row: name, a muscle/exercise
@@ -31,7 +30,7 @@ export function DaysList({
         />
       ))}
       <form action={addDay.bind(null, programId)}>
-        <button className="w-full rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400">
+        <button className="w-full rounded-2xl border border-dashed border-zinc-300 py-4 font-medium text-zinc-500 transition hover:border-lime-500 hover:text-lime-600">
           + Add day
         </button>
       </form>
@@ -50,50 +49,31 @@ function DayRow({
   day: HubDay;
   isLastDone: boolean;
 }) {
-  const [renaming, setRenaming] = useState(false);
   const dayHref = `/workouts/${programId}/days/${day.id}?week=${selectedWeek}`;
   const lastDone = day.lastDoneLabel;
   return (
     <div
       className={`rounded-2xl border p-4 ${
-        isLastDone ? "border-lime-400/60 bg-lime-400/[0.04]" : "border-zinc-800/80 bg-zinc-900/60"
+        isLastDone ? "border-lime-400/60 bg-lime-400/[0.04]" : "border-zinc-200 bg-white"
       }`}
     >
-      {renaming ? (
-        <form
-          action={async (fd: FormData) => {
-            await renameDay(day.id, String(fd.get("name") ?? ""));
-            setRenaming(false);
-          }}
-          className="flex items-center gap-2"
-        >
-          <input
-            name="name"
-            defaultValue={day.name}
-            autoFocus
-            className="flex-1 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1.5 text-zinc-100 focus:border-lime-400 focus:outline-none"
-          />
-          <button className="text-sm text-lime-400">Save</button>
-        </form>
-      ) : (
-        <Link href={dayHref} className="block">
+      <Link href={dayHref} className="block">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold tracking-tight">{day.name}</h3>
             {isLastDone && (
-              <span className="rounded-full bg-lime-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-400">
+              <span className="rounded-full bg-lime-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-600">
                 Last done
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-sm text-zinc-400">
+          <p className="mt-0.5 text-sm text-zinc-500">
             {day.exerciseCount} exercise{day.exerciseCount === 1 ? "" : "s"}
             {day.sectionSummary && ` · ${day.sectionSummary}`}
           </p>
           <p className="mt-0.5 text-xs text-zinc-500">
             {lastDone ? `Last done ${lastDone}` : "Not done yet"}
           </p>
-        </Link>
-      )}
+      </Link>
       <div className="mt-3 flex items-center gap-2">
         {day.unfinishedSessionId ? (
           <Link
@@ -114,28 +94,10 @@ function DayRow({
         )}
         <Link
           href={`/workouts/${programId}/days/${day.id}/edit?week=${selectedWeek}`}
-          className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:border-zinc-500"
+          className="rounded-xl border border-zinc-300 px-4 py-2 text-sm text-zinc-600 transition hover:border-zinc-400"
         >
           Edit
         </Link>
-        <button
-          onClick={() => setRenaming((r) => !r)}
-          className="rounded-xl border border-zinc-800 px-3 py-2 text-sm text-zinc-500 transition hover:text-zinc-300"
-          type="button"
-        >
-          ✎
-        </button>
-        <form
-          action={deleteDay.bind(null, day.id)}
-          onSubmit={(e) => {
-            if (!confirm(`Delete "${day.name}" and all its weeks and logged sessions? This cannot be undone.`))
-              e.preventDefault();
-          }}
-        >
-          <button className="rounded-xl border border-zinc-800 px-3 py-2 text-sm text-zinc-600 transition hover:text-red-400">
-            🗑
-          </button>
-        </form>
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ function tierFor(absDistance: number): 0 | 1 | 2 {
   return 2;
 }
 
-const TIER_CLASS = ["text-white font-medium", "text-zinc-400", "text-zinc-500"] as const;
+const TIER_CLASS = ["text-zinc-900 font-medium", "text-zinc-500", "text-zinc-500"] as const;
 
 const Row = memo(function Row({
   label,
@@ -144,16 +144,16 @@ export function WheelPicker({
         onClick={onClose}
         className="absolute inset-0 bg-black/60 backdrop-blur-[2px]"
       />
-      <div className="relative w-full rounded-t-3xl border-t border-zinc-800 bg-zinc-900 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
+      <div className="relative w-full rounded-t-3xl border-t border-zinc-200 bg-white pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl">
         <div className="grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 pb-1 pt-4">
           <button
             onClick={onClose}
             aria-label="Close"
-            className="grid size-11 place-items-center rounded-full bg-zinc-800 text-xl text-zinc-300 transition hover:bg-zinc-700"
+            className="grid size-11 place-items-center rounded-full bg-zinc-100 text-xl text-zinc-600 transition hover:bg-zinc-200"
           >
             ✕
           </button>
-          <span className="text-center text-base font-semibold text-zinc-100">{title}</span>
+          <span className="text-center text-base font-semibold text-zinc-900">{title}</span>
           <button
             onClick={onClose}
             aria-label="Done"
@@ -167,7 +167,7 @@ export function WheelPicker({
           {/* centre band */}
           <div
             aria-hidden
-            className="pointer-events-none absolute inset-x-4 z-0 rounded-2xl bg-zinc-800/70"
+            className="pointer-events-none absolute inset-x-4 z-0 rounded-2xl bg-zinc-200"
             style={{ height: ITEM_H, top: PAD }}
           />
           <div

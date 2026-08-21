@@ -10,7 +10,7 @@ export default async function ImportPage() {
         <Link
           href="/workouts"
           aria-label="Back to workouts"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-lg text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-900"
         >
           ←
         </Link>

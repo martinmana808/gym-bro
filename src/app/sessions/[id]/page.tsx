@@ -58,13 +58,13 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         <Link
           href={`/workouts/${structure.workout.programId}/days/${structure.workout.id}`}
           aria-label="Back to workout"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/80 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-lg text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-900"
         >
           ←
         </Link>
         <div className="min-w-0">
           <h1 className="truncate text-2xl font-bold tracking-tight">{structure.workout.name}</h1>
-          <p className="text-sm text-zinc-400">
+          <p className="text-sm text-zinc-500">
             {session.startedAt.toLocaleDateString(undefined, {
               weekday: "short",
               month: "short",
@@ -75,7 +75,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       </header>
 
       <div className="grid grid-cols-2 gap-3 text-center">
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5">
           <p className="text-3xl font-bold tabular-nums tracking-tight">
             {durationSeconds > 0 ? formatClock(durationSeconds) : "—"}
           </p>
@@ -83,7 +83,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
             duration
           </p>
         </div>
-        <div className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-5">
+        <div className="rounded-2xl border border-zinc-200 bg-white p-5">
           <p className="text-3xl font-bold tabular-nums tracking-tight">{logs.length}</p>
           <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-zinc-500">
             sets logged
@@ -101,7 +101,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       <form action={deleteSession.bind(null, session.id)} className="mt-auto pt-4 text-center">
         <ConfirmSubmit
           message="Delete this session and its logged sets?"
-          className="text-sm text-zinc-600 transition hover:text-red-400"
+          className="text-sm text-zinc-400 transition hover:text-red-600"
         >
           Delete session
         </ConfirmSubmit>

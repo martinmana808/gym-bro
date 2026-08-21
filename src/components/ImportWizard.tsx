@@ -39,22 +39,22 @@ export function ImportWizard() {
   if (!result) {
     return (
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm text-zinc-500">
           Paste your workout below (or upload a CSV) — days down the page, weeks across as columns.
           Nothing is imported until you confirm the preview.
         </p>
-        <label className="flex flex-col gap-1.5 text-sm text-zinc-400">
+        <label className="flex flex-col gap-1.5 text-sm text-zinc-500">
           Workout name (optional — taken from a “Program,” line otherwise)
           <input
             type="text"
             value={programName}
             onChange={(e) => setProgramName(e.target.value)}
-            className="rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-lime-400 focus:outline-none"
+            className="rounded-2xl border border-zinc-200 bg-white p-3 text-sm text-zinc-700 placeholder:text-zinc-400 focus:border-lime-500 focus:outline-none"
             placeholder="My Split"
           />
         </label>
         <textarea
-          className="h-56 w-full rounded-2xl border border-zinc-800 bg-zinc-900/80 p-3 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-lime-400 focus:outline-none"
+          className="h-56 w-full rounded-2xl border border-zinc-200 bg-white p-3 font-mono text-xs text-zinc-700 placeholder:text-zinc-400 focus:border-lime-500 focus:outline-none"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={
@@ -64,7 +64,7 @@ export function ImportWizard() {
         <input
           type="file"
           accept=".csv,.txt"
-          className="text-sm text-zinc-400 file:mr-3 file:rounded-lg file:border file:border-zinc-700 file:bg-transparent file:px-3 file:py-1.5 file:text-zinc-300"
+          className="text-sm text-zinc-500 file:mr-3 file:rounded-lg file:border file:border-zinc-700 file:bg-transparent file:px-3 file:py-1.5 file:text-zinc-300"
           onChange={(e) => {
             const file = e.target.files?.[0];
             if (file) file.text().then(setText);
@@ -73,14 +73,14 @@ export function ImportWizard() {
         <a
           href="/workout-example.csv"
           download
-          className="text-center text-sm text-lime-400 underline underline-offset-2 hover:text-lime-300"
+          className="text-center text-sm text-lime-600 underline underline-offset-2 hover:text-lime-700"
         >
           Download workout-example.csv
         </a>
         <button
           disabled={!text.trim()}
           onClick={() => setResult(parseWeeksCsv(text))}
-          className="rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
+          className="rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-500/20 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
         >
           Preview import
         </button>
@@ -91,7 +91,7 @@ export function ImportWizard() {
   return (
     <div className="flex flex-col gap-5">
       {result.warnings.map((w) => (
-        <p key={w} className="text-sm text-amber-400">
+        <p key={w} className="text-sm text-amber-600">
           ⚠ {w}
         </p>
       ))}
@@ -100,25 +100,25 @@ export function ImportWizard() {
         {result.weekNames.length === 1 ? "" : "s"} ({result.weekNames.join(", ")})
       </p>
       {result.days.map((day, di) => (
-        <section key={di} className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4">
+        <section key={di} className="rounded-2xl border border-zinc-200 bg-white p-4">
           <h2 className="font-semibold tracking-tight">{day.name}</h2>
           <div className="mt-3 flex flex-col gap-3">
             {day.exercises.map((e, ei) => (
-              <div key={ei} className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3">
+              <div key={ei} className="rounded-xl border border-zinc-200 bg-zinc-100 p-3">
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="text-sm font-medium">{e.name}</span>
                   <span className="text-xs text-zinc-500">{e.sets} sets</span>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {e.sectionName && (
-                    <span className="rounded-lg bg-lime-400/10 px-2 py-1 text-xs text-lime-300">
+                    <span className="rounded-lg bg-lime-500/10 px-2 py-1 text-xs text-lime-600">
                       {e.sectionName}
                     </span>
                   )}
                   {e.perWeek.map((t, wi) => (
                     <span
                       key={wi}
-                      className="rounded-lg bg-zinc-800/70 px-2 py-1 text-xs tabular-nums text-zinc-300"
+                      className="rounded-lg bg-zinc-200 px-2 py-1 text-xs tabular-nums text-zinc-600"
                       title={result.weekNames[wi]}
                     >
                       W{wi + 1}: {targetLabel(t)}
@@ -131,11 +131,11 @@ export function ImportWizard() {
         </section>
       ))}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
       <div className="flex gap-3">
         <button
           onClick={() => setResult(null)}
-          className="flex-1 rounded-2xl border border-zinc-700 py-3.5 font-semibold text-zinc-300 transition hover:border-zinc-500"
+          className="flex-1 rounded-2xl border border-zinc-300 py-3.5 font-semibold text-zinc-600 transition hover:border-zinc-400"
         >
           Back
         </button>
@@ -155,7 +155,7 @@ export function ImportWizard() {
               }
             })
           }
-          className="flex-1 rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
+          className="flex-1 rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-500/20 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
         >
           {pending ? "Importing…" : "Import"}
         </button>

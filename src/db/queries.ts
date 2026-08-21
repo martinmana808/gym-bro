@@ -524,6 +524,7 @@ export async function getProgramSheet(
           name: e.name,
           sectionName: e.sectionName,
           weightUnit: e.weightUnit,
+          supersetKey: e.supersetKey,
         })),
     }));
     const cell = (exId: string, weekIndex: number) => {
@@ -593,4 +594,66 @@ export async function getActiveSession(userId: string): Promise<ActiveSessionSum
     steps,
     loggedKeys: logs.map((l) => `${l.exerciseId}#${l.setNumber}`),
   };
+}
+
+export type HistoryEntry = {
+  sessionId: string;
+  programId: string;
+  dayId: string;
+  dayName: string;
+  programName: string;
+  weekName: string;
+  startedAt: Date;
+  durationSeconds: number;
+  setCount: number;
+  volume: number;
+};
+
+/** Finished sessions across every workout, newest first — the History tab. */
+export async function listRecentSessions(userId: string, limit = 60): Promise<HistoryEntry[]> {
+  const db = await getDb();
+  const sessions = await db.query.sessions.findMany({
+    where: eq(schema.sessions.userId, userId),
+    orderBy: desc(schema.sessions.startedAt),
+  });
+  const finished = sessions.filter((s) => s.finishedAt).slice(0, limit);
+  if (!finished.length) return [];
+
+  const dayIds = [...new Set(finished.map((s) => s.dayId))];
+  const days = await db.query.days.findMany({ where: inArray(schema.days.id, dayIds) });
+  const programs = await db.query.programs.findMany({
+    where: inArray(schema.programs.id, [...new Set(days.map((d) => d.programId))]),
+  });
+  const variations = await db.query.variations.findMany({
+    where: inArray(schema.variations.id, [...new Set(finished.map((s) => s.variationId))]),
+  });
+  const logs = await db.query.setLogs.findMany({
+    where: inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
+  });
+
+  const dayById = new Map(days.map((d) => [d.id, d]));
+  const programById = new Map(programs.map((p) => [p.id, p]));
+  const variationById = new Map(variations.map((v) => [v.id, v]));
+
+  return finished.map((s) => {
+    const day = dayById.get(s.dayId);
+    const program = day ? programById.get(day.programId) : undefined;
+    const mine = logs.filter((l) => l.sessionId === s.id);
+    return {
+      sessionId: s.id,
+      programId: program?.id ?? "",
+      dayId: s.dayId,
+      dayName: day?.name ?? "Workout",
+      programName: program?.name ?? "",
+      weekName: variationById.get(s.variationId)?.name ?? "",
+      startedAt: s.startedAt,
+      // Paused stretches aren't workout time.
+      durationSeconds: Math.max(
+        0,
+        (s.finishedAt!.getTime() - s.startedAt.getTime() - s.pausedMs) / 1000,
+      ),
+      setCount: mine.length,
+      volume: mine.reduce((sum, l) => sum + (l.weight ?? 0) * (l.reps ?? 0), 0),
+    };
+  });
 }

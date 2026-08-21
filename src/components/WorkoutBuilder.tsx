@@ -37,8 +37,8 @@ const emptyExercise = (): ExerciseDraft => ({
 });
 
 const field =
-  "w-full rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-2.5 text-zinc-100 " +
-  "placeholder:text-zinc-600 transition focus:border-lime-400 focus:outline-none";
+  "w-full rounded-xl border border-zinc-200 bg-white px-3 py-2.5 text-zinc-900 " +
+  "placeholder:text-zinc-400 transition focus:border-lime-500 focus:outline-none";
 
 export function WorkoutBuilder({
   variationId,
@@ -128,7 +128,7 @@ export function WorkoutBuilder({
   return (
     <div className="flex flex-col gap-5 pb-28">
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm text-zinc-400">{nameLabel}</span>
+        <span className="text-sm text-zinc-500">{nameLabel}</span>
         <input
           className={field}
           value={name}
@@ -138,7 +138,7 @@ export function WorkoutBuilder({
       </label>
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm text-zinc-400">Default rest between sets (seconds)</span>
+        <span className="text-sm text-zinc-500">Default rest between sets (seconds)</span>
         <NumberSelect
           min={0}
           max={300}
@@ -153,10 +153,10 @@ export function WorkoutBuilder({
           return (
             <div
               key={item.key}
-              className="flex items-center gap-2 border-l-2 border-lime-400 bg-lime-400/5 py-2 pl-3 pr-2"
+              className="flex items-center gap-2 border-l-2 border-lime-500 bg-lime-400/5 py-2 pl-3 pr-2"
             >
               <input
-                className="w-full flex-1 bg-transparent text-xs font-semibold uppercase tracking-[0.15em] text-lime-400 placeholder:text-lime-400/40 focus:outline-none"
+                className="w-full flex-1 bg-transparent text-xs font-semibold uppercase tracking-[0.15em] text-lime-600 placeholder:text-lime-400/40 focus:outline-none"
                 value={item.name}
                 onChange={(ev) =>
                   setItems((its) =>
@@ -167,7 +167,7 @@ export function WorkoutBuilder({
                 }
                 placeholder="Muscle group, e.g. Biceps"
               />
-              <div className="flex gap-1 text-zinc-400">
+              <div className="flex gap-1 text-zinc-500">
                 <IconButton
                   label="Move up"
                   disabled={bi === 0}
@@ -211,10 +211,10 @@ export function WorkoutBuilder({
         return (
           <section
             key={block.key}
-            className="rounded-2xl border border-zinc-800/80 bg-zinc-900/60 p-4"
+            className="rounded-2xl border border-zinc-200 bg-white p-4"
           >
             <header className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
+              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-lime-600">
                 {blockNumber}. {blockLabel(block.exercises.length)}
               </h3>
               <div className="flex items-center gap-3">
@@ -228,7 +228,7 @@ export function WorkoutBuilder({
                     onChange={(v) => patchBlock(bi, { sets: Number(v) })}
                   />
                 </label>
-                <div className="flex gap-1 text-zinc-400">
+                <div className="flex gap-1 text-zinc-500">
                   <IconButton
                     label="Move up"
                     disabled={bi === 0}
@@ -269,7 +269,7 @@ export function WorkoutBuilder({
               {block.exercises.map((e, ei) => (
                 <div
                   key={e.key}
-                  className="flex flex-col gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3"
+                  className="flex flex-col gap-2 rounded-xl border border-zinc-200 bg-zinc-100 p-3"
                 >
                   <div className="flex items-center gap-2">
                     <input
@@ -444,7 +444,7 @@ export function WorkoutBuilder({
             {block.exercises.length < 3 && (
               <button
                 type="button"
-                className="mt-3 text-sm text-lime-400 hover:text-lime-300"
+                className="mt-3 text-sm text-lime-600 hover:text-lime-700"
                 onClick={() =>
                   setItems((its) =>
                     its.map((it, i) =>
@@ -465,7 +465,7 @@ export function WorkoutBuilder({
       <div className="flex gap-3">
         <button
           type="button"
-          className="flex-1 rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
+          className="flex-1 rounded-2xl border border-dashed border-zinc-300 py-4 font-medium text-zinc-500 transition hover:border-lime-500 hover:text-lime-600"
           onClick={() =>
             setItems((its) => [
               ...its,
@@ -477,7 +477,7 @@ export function WorkoutBuilder({
         </button>
         <button
           type="button"
-          className="flex-1 rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
+          className="flex-1 rounded-2xl border border-dashed border-zinc-300 py-4 font-medium text-zinc-500 transition hover:border-lime-500 hover:text-lime-600"
           onClick={() =>
             setItems((its) => [...its, { kind: "divider", key: nextKey(), name: "" }])
           }
@@ -486,14 +486,14 @@ export function WorkoutBuilder({
         </button>
       </div>
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-red-600">{error}</p>}
 
-      <div className="fixed inset-x-0 bottom-0 border-t border-zinc-800 bg-zinc-950/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="fixed inset-x-0 bottom-0 border-t border-zinc-200 bg-zinc-950/90 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] backdrop-blur">
         <button
           type="button"
           disabled={pending}
           onClick={save}
-          className="mx-auto block w-full max-w-md rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
+          className="mx-auto block w-full max-w-md rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-500/20 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
         >
           {pending ? "Saving…" : variationId ? "Save changes" : "Create workout"}
         </button>
@@ -520,7 +520,7 @@ function IconButton({
       title={label}
       disabled={disabled}
       onClick={onClick}
-      className="rounded-md px-2 py-1 hover:bg-zinc-800 disabled:opacity-30"
+      className="rounded-md px-2 py-1 hover:bg-zinc-100 disabled:opacity-30"
     >
       {children}
     </button>

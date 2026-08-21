@@ -4,6 +4,10 @@ export type SheetRow = {
   name: string;
   sectionName: string | null;
   weightUnit: "kg" | "bricks";
+  /** Rows sharing a group are one superset. 1 = a plain exercise. */
+  groupSize: number;
+  /** 1-based position inside that group, so the bracket knows its ends. */
+  groupPos: number;
   byWeek: (SheetTargetCell | null)[];
 };
 export type SheetWeekMeta = { position: number; name: string; sessions: { id: string; label: string }[] };
@@ -56,11 +60,14 @@ export function buildSheetRows(
       name: string;
       sectionName: string | null;
       weightUnit: "kg" | "bricks";
+      /** Exercises sharing this key are performed back to back. */
+      supersetKey: string | null;
     }[];
   }[],
   cell: (exId: string, weekIndex: number) => SheetTargetCell,
 ): SheetRow[] {
   const rows: SheetRow[] = [];
+  const groupKeyByRow = new Map<number, string>();
   const indexByKey = new Map<string, number>();
   const indexByName = new Map<string, number>();
   const keyOf = (e: { lineageId: string; name: string }) => `${e.lineageId}|${e.name.toLowerCase()}`;
@@ -76,13 +83,33 @@ export function buildSheetRows(
           name: e.name,
           sectionName: e.sectionName,
           weightUnit: e.weightUnit,
+          groupSize: 1,
+          groupPos: 1,
           byWeek: weeks.map(() => null),
         });
+        // Grouping comes from the first week that places this exercise.
+        if (e.supersetKey) groupKeyByRow.set(idx, e.supersetKey);
         indexByName.set(e.name.toLowerCase(), idx);
       }
       indexByKey.set(k, idx);
       rows[idx].byWeek[wi] = cell(e.id, wi);
     }
   });
+
+  // Mark each row with the size of its superset and where it sits inside it,
+  // so the sheet can draw one bracket per group instead of a label per row.
+  // Only runs of adjacent rows count — a group split apart isn't a superset.
+  let i = 0;
+  while (i < rows.length) {
+    const key = groupKeyByRow.get(i);
+    let j = i + 1;
+    if (key) while (j < rows.length && groupKeyByRow.get(j) === key) j++;
+    const size = j - i;
+    for (let k = i; k < j; k++) {
+      rows[k].groupSize = size;
+      rows[k].groupPos = k - i + 1;
+    }
+    i = j;
+  }
   return rows;
 }

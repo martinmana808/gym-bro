@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ServiceWorkerRegistrar } from "@/components/ServiceWorkerRegistrar";
-import { ActiveSessionBar } from "@/components/ActiveSessionBar";
+import { AppChrome } from "@/components/AppChrome";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -18,12 +18,12 @@ export const metadata: Metadata = {
   title: "Gym Bro",
   description: "Your workout routine, tracked set by set.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Gym Bro" },
+  appleWebApp: { capable: true, statusBarStyle: "default", title: "Gym Bro" },
   icons: { icon: "/icon-192.png", apple: "/apple-icon.png" },
 };
 
 export const viewport: Viewport = {
-  themeColor: "#09090b",
+  themeColor: "#fafafa",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -42,17 +42,17 @@ export default function RootLayout({
       {/* Installed on iOS there is no browser chrome, and viewportFit:"cover"
           lets us draw under the status bar — so every page needs the top inset
           or the first row of controls sits beneath the clock. */}
-      <body className="flex min-h-full flex-col pt-[env(safe-area-inset-top)] text-zinc-100">
+      <body className="flex min-h-full flex-col pt-[env(safe-area-inset-top)] text-zinc-900">
         {/* Padding alone only moves the *start* of the page — scrolled content
             still passes under the translucent iOS status bar. This opaque strip
             sits over that area so the clock and battery stay readable. */}
         <div
           aria-hidden
-          className="fixed inset-x-0 top-0 z-[90] h-[env(safe-area-inset-top)] bg-[#09090b]"
+          className="fixed inset-x-0 top-0 z-[90] h-[env(safe-area-inset-top)] bg-[#fafafa]"
         />
         <ServiceWorkerRegistrar />
         {children}
-        <ActiveSessionBar />
+        <AppChrome />
       </body>
     </html>
   );

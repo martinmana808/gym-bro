@@ -31,8 +31,8 @@ export function WeekTabs({
               href={`${basePath}?week=${w.position}`}
               className={`rounded-full border px-3 py-1.5 text-sm transition ${
                 w.position === selectedWeek
-                  ? "border-lime-400 bg-lime-400/10 font-medium text-lime-400"
-                  : "border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200"
+                  ? "border-lime-500 bg-lime-500/10 font-medium text-lime-600"
+                  : "border-zinc-200 text-zinc-500 hover:border-zinc-400 hover:text-zinc-800"
               }`}
             >
               {w.name}
@@ -40,7 +40,7 @@ export function WeekTabs({
           ))}
           <form action={addWeek.bind(null, programId, selectedWeek)}>
             <button
-              className="rounded-full border border-dashed border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
+              className="rounded-full border border-dashed border-zinc-300 px-3 py-1.5 text-sm text-zinc-500 transition hover:border-lime-500 hover:text-lime-600"
               title="Copy the current week forward"
             >
               + Week
@@ -51,7 +51,7 @@ export function WeekTabs({
         {active && !editing && (
           <button
             onClick={() => setEditing(true)}
-            className="shrink-0 rounded-full border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 transition hover:border-zinc-500"
+            className="shrink-0 rounded-full border border-zinc-300 px-3 py-1.5 text-sm text-zinc-600 transition hover:border-zinc-400"
           >
             Edit
           </button>
@@ -72,9 +72,9 @@ export function WeekTabs({
               defaultValue={active.name}
               autoFocus
               aria-label="Week name"
-              className="w-32 rounded-lg border border-zinc-700 bg-zinc-900 px-2 py-1 text-sm text-zinc-100 focus:border-lime-400 focus:outline-none"
+              className="w-32 rounded-lg border border-zinc-300 bg-white px-2 py-1 text-sm text-zinc-900 focus:border-lime-500 focus:outline-none"
             />
-            <button className="text-sm font-medium text-lime-400">Save</button>
+            <button className="text-sm font-medium text-lime-600">Save</button>
           </form>
           <div className="flex items-center gap-3 text-xs text-zinc-500">
             {weeks.length > 1 && (
@@ -89,10 +89,10 @@ export function WeekTabs({
                     e.preventDefault();
                 }}
               >
-                <button className="transition hover:text-red-400">Delete week</button>
+                <button className="transition hover:text-red-600">Delete week</button>
               </form>
             )}
-            <button onClick={() => setEditing(false)} className="transition hover:text-zinc-300">
+            <button onClick={() => setEditing(false)} className="transition hover:text-zinc-700">
               Cancel
             </button>
           </div>
