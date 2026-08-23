@@ -80,7 +80,7 @@ export function AppChrome() {
             <SessionWidget
               view={activeSessionView(active, now)}
               trailing={
-                <span className="grid size-11 shrink-0 place-items-center text-2xl text-zinc-400">
+                <span className="grid size-11 shrink-0 place-items-center text-2xl text-zinc-500">
                   ›
                 </span>
               }
@@ -115,14 +115,14 @@ export function NavBar({
 
   return (
     <nav
-      className="border-t border-zinc-200 bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
-      style={{ boxShadow: "0 -1px 12px rgb(24 24 27 / 0.06)" }}
+      className="border-t border-zinc-800 bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
+      style={{ boxShadow: "0 -1px 16px rgb(0 0 0 / 0.5)" }}
     >
       <div className="mx-auto flex w-full max-w-md" style={{ height: NAV_HEIGHT }}>
         {tabs.map((t) => {
           const activeTab = t.match.test(pathname);
           const cls = `flex flex-1 flex-col items-center justify-center gap-1 text-[0.65rem] font-medium transition ${
-            activeTab ? "text-lime-600" : "text-zinc-400"
+            activeTab ? "text-lime-400" : "text-zinc-500"
           }`;
           if (!t.href) {
             return (

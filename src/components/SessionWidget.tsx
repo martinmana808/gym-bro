@@ -7,10 +7,10 @@ import type { ActiveSessionView } from "@/lib/activeSession";
 export const WIDGET_SPACE = "6.5rem";
 
 const ACCENTS = {
-  working: { text: "text-lime-600", bar: "bg-lime-400", ring: "border-lime-500" },
-  resting: { text: "text-sky-600", bar: "bg-sky-400", ring: "border-sky-500" },
-  paused: { text: "text-zinc-500", bar: "bg-zinc-500", ring: "border-zinc-300" },
-  done: { text: "text-amber-600", bar: "bg-amber-400", ring: "border-amber-500" },
+  working: { text: "text-lime-400", bar: "bg-lime-400", ring: "border-lime-600" },
+  resting: { text: "text-sky-400", bar: "bg-sky-400", ring: "border-sky-600" },
+  paused: { text: "text-zinc-400", bar: "bg-zinc-500", ring: "border-zinc-700" },
+  done: { text: "text-amber-400", bar: "bg-amber-400", ring: "border-amber-600" },
 } as const;
 
 /**
@@ -30,10 +30,10 @@ export function SessionWidget({
   // Sits flush on the tab bar, so it's rounded and bordered on top only.
   return (
     <div
-      className={`mx-auto w-full max-w-md rounded-t-2xl border-x-2 border-t-2 ${accent.ring} bg-white/95 px-4 pb-3 pt-3 backdrop-blur`}
+      className={`mx-auto w-full max-w-md rounded-t-2xl border-x-2 border-t-2 ${accent.ring} bg-zinc-950/95 px-4 pb-3 pt-3 backdrop-blur`}
     >
       {/* How much of the workout is logged. */}
-      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-100">
+      <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
         <div
           className={`h-full rounded-full ${accent.bar} transition-all duration-500`}
           style={{ width: `${Math.round(view.progress * 100)}%` }}
@@ -42,12 +42,12 @@ export function SessionWidget({
 
       <div className="mt-2.5 flex items-center gap-3">
         <div className="min-w-0 flex-1">
-          <p className="truncate text-xl font-bold tracking-tight text-zinc-900">
+          <p className="truncate text-xl font-bold tracking-tight text-zinc-100">
             {view.title}
             {view.timer && <span className={`ml-2 tabular-nums ${accent.text}`}>{view.timer}</span>}
           </p>
           <p className="mt-0.5 flex items-baseline gap-2.5 text-sm">
-            <span className="truncate text-zinc-600">{view.subtitle}</span>
+            <span className="truncate text-zinc-300">{view.subtitle}</span>
             {view.position && <span className={`shrink-0 ${accent.text}`}>{view.position}</span>}
           </p>
         </div>
@@ -58,7 +58,7 @@ export function SessionWidget({
 }
 
 const ICON_BUTTON =
-  "grid size-11 shrink-0 place-items-center rounded-full bg-zinc-100 text-zinc-700 transition hover:bg-zinc-200 active:scale-95 disabled:opacity-40";
+  "grid size-11 shrink-0 place-items-center rounded-full bg-zinc-800 text-zinc-200 transition hover:bg-zinc-700 active:scale-95 disabled:opacity-40";
 
 export function PauseButton({
   paused,

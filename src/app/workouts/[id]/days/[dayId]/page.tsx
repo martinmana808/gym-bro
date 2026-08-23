@@ -85,17 +85,17 @@ export default async function DayDetailPage({
         <Link
           href={`/workouts/${programId}`}
           aria-label="Back to workout"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-lg text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-900"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/60 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
         >
           ←
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-2xl font-bold tracking-tight">{workout.name}</h1>
-          <p className="text-sm text-zinc-500">Default rest: {formatSeconds(workout.defaultRestSeconds)}</p>
+          <p className="text-sm text-zinc-400">Default rest: {formatSeconds(workout.defaultRestSeconds)}</p>
         </div>
         <Link
           href={`/workouts/${programId}/days/${dayId}/edit?week=${selectedWeek}`}
-          className="rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-400"
+          className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-600"
         >
           Edit
         </Link>
@@ -112,7 +112,7 @@ export default async function DayDetailPage({
           bottom of the screen already says so and links straight into it. */}
       {!unfinished && (
         <form action={startSession.bind(null, dayId, cellVariationId)}>
-          <button className="w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-500/20 transition hover:bg-lime-300 active:scale-[0.98]">
+          <button className="w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98]">
             Start workout
           </button>
         </form>
@@ -129,15 +129,15 @@ export default async function DayDetailPage({
                 {/* Same left padding as the cards below, so the whole plan
                     column lines up whether or not a block is a superset. */}
                 {showHeader && (
-                  <p className="mb-2.5 mt-2 pl-4 text-xs font-semibold uppercase tracking-[0.15em] text-lime-600">
+                  <p className="mb-2.5 mt-2 pl-4 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
                     {section}
                   </p>
                 )}
-                <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
                   {block.exercises.map((e) => (
                     <div key={e.id} className="flex items-baseline justify-between gap-3 py-1">
                       <span className="font-medium">{e.name}</span>
-                      <span className="whitespace-nowrap text-sm text-zinc-500">
+                      <span className="whitespace-nowrap text-sm text-zinc-400">
                         {formatTarget(e)}
                         {e.targetWeight != null && ` · ${formatTargetWeight(e)}`}
                         {e.restOverrideSeconds != null && ` · rest ${formatSeconds(e.restOverrideSeconds)}`}
@@ -149,23 +149,23 @@ export default async function DayDetailPage({
             );
           })}
           {blocks.length === 0 && (
-            <p className="text-sm text-zinc-500">No exercises yet — hit Edit to add some.</p>
+            <p className="text-sm text-zinc-400">No exercises yet — hit Edit to add some.</p>
           )}
         </div>
       </section>
 
       <section>
-        <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-500">History</h2>
+        <h2 className="mb-2 text-xs font-semibold uppercase tracking-[0.15em] text-zinc-400">History</h2>
         {columns.length === 0 ? (
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-zinc-400">
             No finished sessions in this week yet. Your logged sets will show up here, one column per
             session.
           </p>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-zinc-200">
+          <div className="overflow-x-auto rounded-2xl border border-zinc-800">
             <table className="w-full min-w-max text-sm">
               <thead>
-                <tr className="border-b border-zinc-200 bg-white text-left text-zinc-500">
+                <tr className="border-b border-zinc-800 bg-zinc-900/60 text-left text-zinc-400">
                   <th className="px-3 py-2.5 font-medium">Exercise</th>
                   <th className="px-3 py-2.5 font-medium">Target</th>
                   <th className="px-3 py-2.5 font-medium">Weight</th>
@@ -175,9 +175,9 @@ export default async function DayDetailPage({
                       : 0;
                     return (
                       <th key={s.id} className="px-3 py-2 font-medium align-top">
-                        <Link href={`/sessions/${s.id}`} className="block transition hover:text-lime-600">
+                        <Link href={`/sessions/${s.id}`} className="block transition hover:text-lime-400">
                           {s.startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                          <span className="block text-[11px] font-normal tabular-nums text-zinc-500">
+                          <span className="block text-[11px] font-normal tabular-nums text-zinc-400">
                             {durationSeconds > 0 ? formatClock(durationSeconds) : "—"}
                           </span>
                         </Link>
@@ -196,26 +196,26 @@ export default async function DayDetailPage({
                   return (
                     <Fragment key={e.id}>
                       {showSection && (
-                        <tr className="border-b border-zinc-200 bg-zinc-50">
+                        <tr className="border-b border-zinc-800 bg-zinc-950">
                           <td
                             colSpan={3 + columns.length}
-                            className="border-l-2 border-lime-500 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-lime-600"
+                            className="border-l-2 border-lime-400 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-lime-400"
                           >
                             {section}
                           </td>
                         </tr>
                       )}
-                      <tr className="border-b border-zinc-200 last:border-0 even:bg-zinc-900/30">
+                      <tr className="border-b border-zinc-800 last:border-0 even:bg-zinc-900/30">
                         <td className={`px-3 py-2.5 font-medium ${grouped ? "border-l-2 border-lime-400/50" : ""}`}>
                           {e.name}
                           {grouped && group?.firstId === e.id && (
-                            <span className="ml-2 rounded bg-lime-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-600/80">
+                            <span className="ml-2 rounded bg-lime-400/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-400/80">
                               {group.label}
                             </span>
                           )}
                         </td>
-                        <td className="px-3 py-2.5 text-zinc-500">{formatTarget(e)}</td>
-                        <td className="px-3 py-2.5 tabular-nums text-zinc-600">
+                        <td className="px-3 py-2.5 text-zinc-400">{formatTarget(e)}</td>
+                        <td className="px-3 py-2.5 tabular-nums text-zinc-300">
                           {formatCurrentWeight(currentWeight(e.id), e.weightUnit)}
                         </td>
                         {columns.map((s) => {
@@ -225,7 +225,7 @@ export default async function DayDetailPage({
                             <td key={s.id} className="whitespace-nowrap px-3 py-2.5 tabular-nums">
                               {formatExerciseSessionCell(e, logs)}
                               {note && (
-                                <span title={note} className="ml-0.5 cursor-help text-lime-600">
+                                <span title={note} className="ml-0.5 cursor-help text-lime-400">
                                   *
                                 </span>
                               )}

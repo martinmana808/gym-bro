@@ -30,7 +30,7 @@ export default async function WorkoutHubPage({
         <Link
           href="/workouts"
           aria-label="Back to workouts"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-lg text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-900"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/60 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
         >
           ←
         </Link>
@@ -56,7 +56,7 @@ export default async function WorkoutHubPage({
 
       <Link
         href={`/workouts/${hub.program.id}/sheet`}
-        className="rounded-2xl border border-zinc-200 bg-white px-4 py-3 text-center text-sm font-medium text-zinc-600 transition hover:border-zinc-300"
+        className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-center text-sm font-medium text-zinc-300 transition hover:border-zinc-700"
       >
         📊 Spreadsheet view — all weeks &amp; sessions
       </Link>
@@ -64,7 +64,7 @@ export default async function WorkoutHubPage({
       <form action={deleteProgram.bind(null, hub.program.id)} className="mt-2 text-center">
         <ConfirmSubmit
           message={`Delete the whole "${hub.program.name}" workout — every day, week and session? This cannot be undone.`}
-          className="text-sm text-zinc-400 transition hover:text-red-600"
+          className="text-sm text-zinc-500 transition hover:text-red-400"
         >
           Delete workout
         </ConfirmSubmit>

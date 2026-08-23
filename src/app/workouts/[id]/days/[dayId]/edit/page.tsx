@@ -44,7 +44,7 @@ export default async function EditCellPage({
         <Link
           href={`/workouts/${programId}/days/${dayId}?week=${selectedWeek}`}
           aria-label="Back to day"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-200 bg-white text-lg text-zinc-500 transition hover:border-zinc-400 hover:text-zinc-900"
+          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/60 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
         >
           ←
         </Link>
@@ -52,8 +52,8 @@ export default async function EditCellPage({
           <h1 className="text-2xl font-bold tracking-tight">
             {isFirstWeek ? "Edit day" : "Edit week"}
           </h1>
-          <p className="truncate text-sm text-zinc-500">
-            {workout.name} · <span className="text-lime-600">{weeks.find((w) => w.position === selectedWeek)?.name}</span>
+          <p className="truncate text-sm text-zinc-400">
+            {workout.name} · <span className="text-lime-400">{weeks.find((w) => w.position === selectedWeek)?.name}</span>
           </p>
         </div>
       </header>
@@ -119,7 +119,7 @@ export default async function EditCellPage({
         <form action={deleteDay.bind(null, dayId)} className="mt-2 text-center">
           <ConfirmSubmit
             message={`Delete "${workout.name}" and all its weeks and sessions? This cannot be undone.`}
-            className="text-sm text-zinc-400 transition hover:text-red-600"
+            className="text-sm text-zinc-500 transition hover:text-red-400"
           >
             Delete day
           </ConfirmSubmit>

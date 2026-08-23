@@ -30,7 +30,7 @@ export function DaysList({
         />
       ))}
       <form action={addDay.bind(null, programId)}>
-        <button className="w-full rounded-2xl border border-dashed border-zinc-300 py-4 font-medium text-zinc-500 transition hover:border-lime-500 hover:text-lime-600">
+        <button className="w-full rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400">
           + Add day
         </button>
       </form>
@@ -54,23 +54,23 @@ function DayRow({
   return (
     <div
       className={`rounded-2xl border p-4 ${
-        isLastDone ? "border-lime-400/60 bg-lime-400/[0.04]" : "border-zinc-200 bg-white"
+        isLastDone ? "border-lime-400/60 bg-lime-400/[0.04]" : "border-zinc-800 bg-zinc-900/60"
       }`}
     >
       <Link href={dayHref} className="block">
           <div className="flex items-center gap-2">
             <h3 className="text-lg font-semibold tracking-tight">{day.name}</h3>
             {isLastDone && (
-              <span className="rounded-full bg-lime-500/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-600">
+              <span className="rounded-full bg-lime-400/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-lime-400">
                 Last done
               </span>
             )}
           </div>
-          <p className="mt-0.5 text-sm text-zinc-500">
+          <p className="mt-0.5 text-sm text-zinc-400">
             {day.exerciseCount} exercise{day.exerciseCount === 1 ? "" : "s"}
             {day.sectionSummary && ` · ${day.sectionSummary}`}
           </p>
-          <p className="mt-0.5 text-xs text-zinc-500">
+          <p className="mt-0.5 text-xs text-zinc-400">
             {lastDone ? `Last done ${lastDone}` : "Not done yet"}
           </p>
       </Link>
@@ -94,7 +94,7 @@ function DayRow({
         )}
         <Link
           href={`/workouts/${programId}/days/${day.id}/edit?week=${selectedWeek}`}
-          className="rounded-xl border border-zinc-300 px-4 py-2 text-sm text-zinc-600 transition hover:border-zinc-400"
+          className="rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-300 transition hover:border-zinc-600"
         >
           Edit
         </Link>

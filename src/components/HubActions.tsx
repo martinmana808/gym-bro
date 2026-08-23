@@ -15,7 +15,7 @@ export function HubActions({ programId, name }: { programId: string; name: strin
     return (
       <button
         onClick={() => setOpen(true)}
-        className="shrink-0 rounded-full border border-zinc-300 px-4 py-2 text-sm font-medium text-zinc-600 transition hover:border-zinc-400"
+        className="shrink-0 rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-600"
       >
         Edit
       </button>
@@ -36,15 +36,15 @@ export function HubActions({ programId, name }: { programId: string; name: strin
           defaultValue={name}
           autoFocus
           aria-label="Workout name"
-          className="w-40 rounded-lg border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-lime-500 focus:outline-none"
+          className="w-40 rounded-lg border border-zinc-700 bg-zinc-900/60 px-2 py-1.5 text-sm text-zinc-100 focus:border-lime-400 focus:outline-none"
         />
-        <button className="text-sm font-medium text-lime-600">Save</button>
+        <button className="text-sm font-medium text-lime-400">Save</button>
       </form>
-      <div className="flex items-center gap-3 text-xs text-zinc-500">
+      <div className="flex items-center gap-3 text-xs text-zinc-400">
         <form action={duplicateProgram.bind(null, programId)}>
-          <button className="transition hover:text-lime-600">Duplicate</button>
+          <button className="transition hover:text-lime-400">Duplicate</button>
         </form>
-        <button onClick={() => setOpen(false)} className="transition hover:text-zinc-700">
+        <button onClick={() => setOpen(false)} className="transition hover:text-zinc-300">
           Cancel
         </button>
       </div>
