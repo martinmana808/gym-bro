@@ -74,10 +74,21 @@ export function buildSteps(blocks: RunnerBlock[], defaultRestSeconds: number): S
 
 /** "4 × 10" | "3 × 10–15" | "3 × to failure" | "3 × 45s" */
 export function formatTarget(e: RunnerExercise): string {
-  if (e.measurement === "time") return `${e.sets} × ${formatSeconds(e.timeSeconds ?? 0)}`;
-  if (e.repScheme === "failure") return `${e.sets} × to failure`;
-  if (e.repScheme === "range") return `${e.sets} × ${e.repsMin}–${e.repsMax}`;
-  return `${e.sets} × ${e.repsMin}`;
+  return `${e.sets} sets × ${formatReps(e)}`;
+}
+
+/** "10 reps" | "10–15 reps" | "to failure" | "45s" — the effort half of a target. */
+export function formatReps(e: {
+  measurement: "reps" | "time";
+  repScheme: "fixed" | "range" | "failure" | null;
+  repsMin: number | null;
+  repsMax: number | null;
+  timeSeconds: number | null;
+}): string {
+  if (e.measurement === "time") return formatSeconds(e.timeSeconds ?? 0);
+  if (e.repScheme === "failure") return "to failure";
+  if (e.repScheme === "range") return `${e.repsMin}–${e.repsMax} reps`;
+  return `${e.repsMin} reps`;
 }
 
 export type LoggedSet = {

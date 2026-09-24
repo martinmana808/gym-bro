@@ -7,6 +7,7 @@ import { deleteSession, finishSession, logSet, saveSessionNote } from "@/app/act
 import {
   blockLabel,
   buildSteps,
+  formatReps,
   formatClock,
   formatLoggedSet,
   formatTarget,
@@ -71,6 +72,8 @@ export function SessionRunner({
   useWakeLock(true);
   const steps = useMemo(() => buildSteps(blocks, defaultRestSeconds), [blocks, defaultRestSeconds]);
   const setSteps = useMemo(() => steps.filter((s): s is SetStep => s.kind === "set"), [steps]);
+  // buildSteps indexes blockIndex into the non-empty blocks, so match that.
+  const usedBlocks = useMemo(() => blocks.filter((b) => b.exercises.length > 0), [blocks]);
 
   const [logs, setLogs] = useState<Map<string, LogEntry>>(
     () => new Map(initialLogs.map((l) => [logKey(l.exerciseId, l.setNumber), l])),
@@ -106,6 +109,9 @@ export function SessionRunner({
   const [pausedAtMs, setPausedAtMs] = useState<number | null>(initialPausedAtMs);
   const [pausedMs, setPausedMs] = useState(initialPausedMs);
   const [pausing, setPausing] = useState(false);
+  // "Dismiss" leaves the rest running — it just gets out of the way so you can
+  // look around the app. The widget keeps the countdown on screen.
+  const [restHidden, setRestHidden] = useState(false);
 
   const step = setSteps[setIndex];
 
@@ -171,6 +177,7 @@ export function SessionRunner({
   const startRest = useCallback(
     (seconds: number, nextExercise: string | null) => {
       setResting({ endsAt: Date.now() + seconds * 1000, total: seconds });
+      setRestHidden(false);
       void startRestOnServer({ seconds, nextExercise, sessionId });
     },
     [sessionId],
@@ -305,6 +312,9 @@ export function SessionRunner({
     setPausing(false);
   };
   const prev = step ? prevMap.get(logKey(step.exercise.id, step.setNumber)) : undefined;
+  // Coming back to a set you've already done should read as done, not pending.
+  const logged = stepKey ? logs.get(stepKey) : undefined;
+  const alreadyLogged = Boolean(logged);
 
   return (
     <>
@@ -328,7 +338,7 @@ export function SessionRunner({
             {setSteps.length} sets
           </p>
         </div>
-      {isResting && resting ? (
+      {isResting && resting && !restHidden ? (
         <RestScreen
           remaining={restRemaining}
           total={resting.total}
@@ -342,7 +352,12 @@ export function SessionRunner({
             });
           }}
           onSkip={stopRest}
+          onDismiss={() => setRestHidden(true)}
           nextUp={step ? step.exercise.name : null}
+          nextTarget={step ? formatStepTarget(step.exercise) : null}
+          rundown={
+            step ? <BlockRundown block={usedBlocks[step.blockIndex]} currentId={step.exercise.id} /> : null
+          }
           justDid={justDid}
         />
       ) : done ? (
@@ -366,10 +381,17 @@ export function SessionRunner({
           <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
             <p className="text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
               {step.blockSize > 1
-                ? `${blockLabel(step.blockSize)} ${step.posInRound}/${step.blockSize} · round ${step.round}/${step.rounds}`
-                : `Set ${step.round} of ${step.rounds}`}
+                ? `${blockLabel(step.blockSize)} ${step.posInRound}/${step.blockSize} · Round ${step.round}/${step.rounds}`
+                : `Set ${step.round}/${step.rounds}`}
             </p>
-            <h2 className="mt-2 text-3xl font-bold tracking-tight">{step.exercise.name}</h2>
+            <div className="mt-2 flex items-start gap-2">
+              <h2 className="flex-1 text-3xl font-bold tracking-tight">{step.exercise.name}</h2>
+              {alreadyLogged && (
+                <span className="mt-1.5 shrink-0 rounded-full bg-lime-400/15 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wider text-lime-400">
+                  ✓ Done
+                </span>
+              )}
+            </div>
             {step.exercise.note && (
               <p className="mt-1 text-sm text-zinc-400">{step.exercise.note}</p>
             )}
@@ -378,12 +400,19 @@ export function SessionRunner({
                 Target {formatTarget(step.exercise)}
                 {step.exercise.targetWeight != null ? ` · ${formatTargetWeight(step.exercise)}` : ""}
               </span>
+              {alreadyLogged && logged && (
+                <span className="rounded-full bg-lime-400/10 px-3 py-1 tabular-nums text-lime-400">
+                  Logged {formatLoggedSet(logged, step.exercise.weightUnit)}
+                </span>
+              )}
               {prev && (
                 <span className="rounded-full bg-zinc-800/80 px-3 py-1 tabular-nums text-zinc-400">
                   Last time {formatLoggedSet(prev, step.exercise.weightUnit)}
                 </span>
               )}
             </div>
+            <BlockRundown block={usedBlocks[step.blockIndex]} currentId={step.exercise.id} />
+
             <TodayNote
               key={step.exercise.id}
               initial={notes.get(step.exercise.id) ?? ""}
@@ -422,13 +451,27 @@ export function SessionRunner({
                 </label>
                 {step.exercise.measurement === "reps" ? (
                   <label className="flex flex-col gap-1.5">
-                    <span className="text-sm text-zinc-400">Reps</span>
-                    <NumberSelect value={reps} onChange={setReps} min={0} max={60} step={1} title="Reps" />
+                    <span className="text-sm text-zinc-400">
+                      Reps
+                      {step.exercise.repScheme === "failure" && (
+                        <span className="text-zinc-500"> · to failure</span>
+                      )}
+                    </span>
+                    <NumberSelect
+                      value={reps}
+                      onChange={setReps}
+                      min={0}
+                      max={60}
+                      step={1}
+                      title="Reps"
+                      blank={step.exercise.repScheme === "failure"}
+                      blankLabel="to failure"
+                    />
                   </label>
                 ) : (
                   <label className="flex flex-col gap-1.5">
-                    <span className="text-sm text-zinc-400">Seconds</span>
-                    <NumberSelect value={seconds} onChange={setSeconds} min={5} max={300} step={5} title="Seconds" />
+                    <span className="text-sm text-zinc-400">Time (seconds)</span>
+                    <NumberSelect value={seconds} onChange={setSeconds} min={5} max={300} step={5} title="Time (seconds)" />
                   </label>
                 )}
               </div>
@@ -466,7 +509,7 @@ export function SessionRunner({
             disabled={saving || discarding}
             className="rounded-2xl bg-lime-400/15 py-4 text-lg font-bold text-lime-400 transition hover:bg-lime-400/25 active:scale-[0.98] disabled:opacity-50"
           >
-            {saving ? "Saving…" : "Log set"}
+            {saving ? "Saving…" : alreadyLogged ? "Update set" : "Log set"}
           </button>
 
           <div className="flex justify-between text-sm text-zinc-400">
@@ -592,14 +635,21 @@ function RestScreen({
   total,
   onExtend,
   onSkip,
+  onDismiss,
   nextUp,
+  nextTarget,
+  rundown,
   justDid,
 }: {
   remaining: number;
   total: number;
   onExtend: () => void;
   onSkip: () => void;
+  onDismiss: () => void;
   nextUp: string | null;
+  /** The load for the next set, so you can set the machine up while resting. */
+  nextTarget: string | null;
+  rundown: React.ReactNode;
   justDid: string | null;
 }) {
   const pct = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
@@ -624,24 +674,81 @@ function RestScreen({
         </div>
       </div>
       {nextUp && (
-        <p className="text-zinc-400">
-          Next up: <span className="font-medium text-zinc-100">{nextUp}</span>
-        </p>
+        <div className="w-full">
+          <p className="text-zinc-400">
+            Next up: <span className="font-medium text-zinc-100">{nextUp}</span>
+          </p>
+          {/* The load, so you can load the bar before the timer runs out. */}
+          {nextTarget && (
+            <p className="mt-1 text-lg font-semibold tabular-nums text-sky-400">{nextTarget}</p>
+          )}
+          <div className="mt-3 text-left">{rundown}</div>
+        </div>
       )}
-      <div className="flex gap-3">
+      <div className="flex flex-wrap justify-center gap-3">
         <button
           onClick={onExtend}
-          className="rounded-2xl border border-zinc-700 px-7 py-3.5 font-semibold text-zinc-200 transition hover:border-sky-400 active:scale-[0.98]"
+          className="rounded-2xl border border-zinc-700 px-6 py-3.5 font-semibold text-zinc-200 transition hover:border-sky-400 active:scale-[0.98]"
         >
           +30s
         </button>
         <button
           onClick={onSkip}
-          className="rounded-2xl bg-sky-400 px-7 py-3.5 font-semibold text-zinc-950 shadow-lg shadow-sky-400/20 transition hover:bg-sky-300 active:scale-[0.98]"
+          className="rounded-2xl bg-sky-400 px-6 py-3.5 font-semibold text-zinc-950 shadow-lg shadow-sky-400/20 transition hover:bg-sky-300 active:scale-[0.98]"
         >
           Skip rest
         </button>
       </div>
+      {/* Leaves the clock running — it carries on in the bottom widget. */}
+      <button
+        onClick={onDismiss}
+        className="text-sm text-zinc-400 underline underline-offset-4 transition hover:text-zinc-200"
+      >
+        Dismiss — keep the timer running
+      </button>
+    </div>
+  );
+}
+
+/**
+ * What a superset is made of, with the current exercise highlighted. Shown on
+ * the set screen and while resting: knowing the pair up front is the
+ * difference between preparing for it and discovering it.
+ */
+function BlockRundown({
+  block,
+  currentId,
+}: {
+  block: RunnerBlock | undefined;
+  currentId: string;
+}) {
+  if (!block || block.exercises.length < 2) return null;
+  return (
+    <div className="mt-3 rounded-xl border border-zinc-800 bg-zinc-950/40 p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+        {blockLabel(block.exercises.length)} · back to back
+      </p>
+      <ul className="mt-1.5 flex flex-col gap-1">
+        {block.exercises.map((e, i) => {
+          const isCurrent = e.id === currentId;
+          return (
+            <li
+              key={e.id}
+              className={`flex items-baseline justify-between gap-3 text-sm ${
+                isCurrent ? "font-semibold text-zinc-100" : "text-zinc-400"
+              }`}
+            >
+              <span className="truncate">
+                {i + 1}. {e.name}
+              </span>
+              <span className="shrink-0 tabular-nums">
+                {e.targetWeight != null ? `${formatTargetWeight(e)} · ` : ""}
+                {formatReps(e)}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
     </div>
   );
 }

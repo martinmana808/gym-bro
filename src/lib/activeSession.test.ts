@@ -18,7 +18,7 @@ const step = (
   setNumber,
   rounds: 3,
   blockSize: 2,
-  targetLabel: "40kg / 8rep",
+  targetLabel: "40 kg · 8 reps",
   ...extra,
 });
 
@@ -42,8 +42,8 @@ describe("activeSessionView — working", () => {
     const v = activeSessionView(base, NOW);
     expect(v.mode).toBe("working");
     expect(v.title).toBe("Press plano");
-    expect(v.subtitle).toBe("40kg / 8rep");
-    expect(v.position).toBe("Superset 1/3");
+    expect(v.subtitle).toBe("40 kg · 8 reps");
+    expect(v.position).toBe("Round 1/3");
     expect(v.timer).toBeNull();
   });
 
@@ -162,29 +162,29 @@ describe("formatStepTarget", () => {
   };
 
   it("pairs weight with reps", () => {
-    expect(formatStepTarget(e)).toBe("40kg / 8rep");
+    expect(formatStepTarget(e)).toBe("40 kg · 8 reps");
   });
 
   it("marks bricks", () => {
     expect(formatStepTarget({ ...e, weightUnit: "bricks", targetWeight: 7, repsMin: 10 })).toBe(
-      "7br / 10rep",
+      "7 br · 10 reps",
     );
   });
 
   it("drops the weight for bodyweight work", () => {
-    expect(formatStepTarget({ ...e, targetWeight: null })).toBe("8rep");
+    expect(formatStepTarget({ ...e, targetWeight: null })).toBe("8 reps");
   });
 
   it("trims trailing zeros", () => {
-    expect(formatStepTarget({ ...e, targetWeight: 42.5 })).toBe("42.5kg / 8rep");
-    expect(formatStepTarget({ ...e, targetWeight: 40.0 })).toBe("40kg / 8rep");
+    expect(formatStepTarget({ ...e, targetWeight: 42.5 })).toBe("42.5 kg · 8 reps");
+    expect(formatStepTarget({ ...e, targetWeight: 40.0 })).toBe("40 kg · 8 reps");
   });
 
   it("renders ranges and failure", () => {
     expect(formatStepTarget({ ...e, repScheme: "range", repsMin: 10, repsMax: 15 })).toBe(
-      "40kg / 10-15rep",
+      "40 kg · 10–15 reps",
     );
-    expect(formatStepTarget({ ...e, repScheme: "failure" })).toBe("40kg / to failure");
+    expect(formatStepTarget({ ...e, repScheme: "failure" })).toBe("40 kg · to failure");
   });
 
   it("renders time exercises", () => {

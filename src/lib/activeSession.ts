@@ -71,23 +71,25 @@ export function formatStepTarget(e: {
   targetWeight: number | null;
 }): string {
   const weight =
-    e.targetWeight == null ? null : `${trim(e.targetWeight)}${e.weightUnit === "bricks" ? "br" : "kg"}`;
+    e.targetWeight == null
+      ? null
+      : `${trim(e.targetWeight)} ${e.weightUnit === "bricks" ? "br" : "kg"}`;
   let effort: string;
   if (e.measurement === "time") {
     effort = e.timeSeconds != null ? `${e.timeSeconds}s` : "";
   } else if (e.repScheme === "failure") {
     effort = "to failure";
   } else if (e.repScheme === "range" && e.repsMin != null && e.repsMax != null) {
-    effort = `${e.repsMin}-${e.repsMax}rep`;
+    effort = `${e.repsMin}–${e.repsMax} reps`;
   } else {
-    effort = e.repsMin != null ? `${e.repsMin}rep` : "";
+    effort = e.repsMin != null ? `${e.repsMin} reps` : "";
   }
-  return [weight, effort].filter(Boolean).join(" / ");
+  return [weight, effort].filter(Boolean).join(" · ");
 }
 
 /** "Superset 2/3" for a grouped block, "Set 2/3" for a plain exercise. */
 function positionLabel(step: ActiveStep): string {
-  return `${step.blockSize > 1 ? "Superset" : "Set"} ${step.setNumber}/${step.rounds}`;
+  return `${step.blockSize > 1 ? "Round" : "Set"} ${step.setNumber}/${step.rounds}`;
 }
 
 function mmss(totalSeconds: number): string {

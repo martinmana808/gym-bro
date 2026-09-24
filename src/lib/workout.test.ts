@@ -91,11 +91,13 @@ describe("buildSteps", () => {
 
 describe("formatting", () => {
   it("formats targets per scheme", () => {
-    expect(formatTarget(ex({ sets: 4, repsMin: 10 }))).toBe("4 × 10");
-    expect(formatTarget(ex({ repScheme: "range", repsMin: 10, repsMax: 15 }))).toBe("3 × 10–15");
-    expect(formatTarget(ex({ repScheme: "failure" }))).toBe("3 × to failure");
-    expect(formatTarget(ex({ measurement: "time", timeSeconds: 45 }))).toBe("3 × 45s");
-    expect(formatTarget(ex({ measurement: "time", timeSeconds: 90 }))).toBe("3 × 1m30");
+    expect(formatTarget(ex({ sets: 4, repsMin: 10 }))).toBe("4 sets × 10 reps");
+    expect(formatTarget(ex({ repScheme: "range", repsMin: 10, repsMax: 15 }))).toBe(
+      "3 sets × 10–15 reps",
+    );
+    expect(formatTarget(ex({ repScheme: "failure" }))).toBe("3 sets × to failure");
+    expect(formatTarget(ex({ measurement: "time", timeSeconds: 45 }))).toBe("3 sets × 45s");
+    expect(formatTarget(ex({ measurement: "time", timeSeconds: 90 }))).toBe("3 sets × 1m30");
   });
 
   it("formats logged sets", () => {
