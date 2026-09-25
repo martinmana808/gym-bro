@@ -91,22 +91,6 @@ export function PauseButton({
   );
 }
 
-export function StopButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      aria-label="Finish workout"
-      title="Finish workout"
-      className={ICON_BUTTON}
-    >
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden>
-        <rect x="2" y="2" width="12" height="12" rx="2.5" />
-      </svg>
-    </button>
-  );
-}
-
 /**
  * Toggles the all-sets grid. The icon flips to a single row when the grid is
  * open, so the same button reads as "back to one set".

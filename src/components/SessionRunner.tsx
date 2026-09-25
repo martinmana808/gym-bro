@@ -28,12 +28,7 @@ import {
   sessionElapsedSeconds,
 } from "@/lib/activeSession";
 import { CHROME_SPACE, NAV_HEIGHT } from "@/components/AppChrome";
-import {
-  PauseButton,
-  SessionWidget,
-  SetsButton,
-  StopButton,
-} from "@/components/SessionWidget";
+import { PauseButton, SessionWidget, SetsButton } from "@/components/SessionWidget";
 
 export type LogEntry = SetEntry;
 
@@ -332,11 +327,18 @@ export function SessionRunner({
             ←
           </Link>
           {/* The widget below has no room for these, but they're worth keeping. */}
-          <p className="text-sm text-zinc-400">
+          <p className="flex-1 text-sm text-zinc-400">
             <span className="tabular-nums">{elapsed}</span>
             {paused && <span className="text-zinc-400"> · paused</span>} · {logs.size}/
             {setSteps.length} sets
           </p>
+          <button
+            onClick={finish}
+            disabled={finishing || discarding}
+            className="shrink-0 rounded-full border border-zinc-700 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-zinc-300 transition hover:border-red-500 hover:text-red-400 disabled:opacity-50"
+          >
+            {finishing ? "Ending…" : "End session"}
+          </button>
         </div>
       {isResting && resting && !restHidden ? (
         <RestScreen
@@ -590,7 +592,6 @@ export function SessionRunner({
             <span className="flex shrink-0 items-center gap-1.5">
               <SetsButton open={showGrid} onClick={() => setShowGrid((v) => !v)} />
               <PauseButton paused={paused} onClick={togglePause} disabled={pausing || finishing} />
-              <StopButton onClick={finish} disabled={finishing || discarding} />
             </span>
           }
         />

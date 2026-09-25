@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { requireUserId } from "@/auth";
 import { listPrograms } from "@/db/queries";
+import { WorkoutAvatar } from "@/components/WorkoutAvatar";
 
 export const dynamic = "force-dynamic";
 
@@ -28,13 +29,16 @@ export default async function WorkoutsPage() {
           key={w.id}
           className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5 transition hover:border-zinc-700"
         >
-          <Link href={`/workouts/${w.id}`} className="block">
-            <h2 className="text-xl font-semibold tracking-tight">{w.name}</h2>
+          <Link href={`/workouts/${w.id}`} className="flex items-center gap-3">
+            <WorkoutAvatar id={w.id} name={w.name} />
+            <span className="min-w-0 flex-1">
+            <h2 className="truncate text-xl font-semibold tracking-tight">{w.name}</h2>
             <p className="mt-1 text-sm text-zinc-400">
               {w.dayCount} day{w.dayCount === 1 ? "" : "s"}
               {w.lastFinishedAt &&
                 ` · last done ${w.lastFinishedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}`}
             </p>
+            </span>
           </Link>
           <div className="mt-4 flex gap-2">
             {w.unfinishedSessionId ? (

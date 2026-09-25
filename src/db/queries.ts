@@ -7,6 +7,7 @@ import {
   formatTarget,
   formatTargetWeight,
   groupExercisesIntoBlocks,
+  sessionTotals,
   type SetStep,
 } from "@/lib/workout";
 import { formatStepTarget, type ActiveSessionInput } from "@/lib/activeSession";
@@ -606,6 +607,7 @@ export type HistoryEntry = {
   startedAt: Date;
   durationSeconds: number;
   setCount: number;
+  repCount: number;
   volume: number;
 };
 
@@ -630,6 +632,14 @@ export async function listRecentSessions(userId: string, limit = 60): Promise<Hi
   const logs = await db.query.setLogs.findMany({
     where: inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
   });
+  // Volume is only honest in kilos, so the unit has to come along.
+  const unitByExercise = new Map(
+    (
+      await db.query.exercises.findMany({
+        where: inArray(schema.exercises.id, [...new Set(logs.map((l) => l.exerciseId))]),
+      })
+    ).map((e) => [e.id, e.weightUnit]),
+  );
 
   const dayById = new Map(days.map((d) => [d.id, d]));
   const programById = new Map(programs.map((p) => [p.id, p]));
@@ -638,7 +648,11 @@ export async function listRecentSessions(userId: string, limit = 60): Promise<Hi
   return finished.map((s) => {
     const day = dayById.get(s.dayId);
     const program = day ? programById.get(day.programId) : undefined;
-    const mine = logs.filter((l) => l.sessionId === s.id);
+    const totals = sessionTotals(
+      logs
+        .filter((l) => l.sessionId === s.id)
+        .map((l) => ({ ...l, weightUnit: unitByExercise.get(l.exerciseId) })),
+    );
     return {
       sessionId: s.id,
       programId: program?.id ?? "",
@@ -652,8 +666,41 @@ export async function listRecentSessions(userId: string, limit = 60): Promise<Hi
         0,
         (s.finishedAt!.getTime() - s.startedAt.getTime() - s.pausedMs) / 1000,
       ),
-      setCount: mine.length,
-      volume: mine.reduce((sum, l) => sum + (l.weight ?? 0) * (l.reps ?? 0), 0),
+      setCount: totals.sets,
+      repCount: totals.reps,
+      volume: totals.volume,
     };
   });
+}
+
+export type HistoryTotals = {
+  sessions: number;
+  sets: number;
+  reps: number;
+  volume: number;
+};
+
+/** Everything you've ever finished, for the banner on the History tab. */
+export async function getHistoryTotals(userId: string): Promise<HistoryTotals> {
+  const db = await getDb();
+  const sessions = await db.query.sessions.findMany({
+    where: eq(schema.sessions.userId, userId),
+  });
+  const finished = sessions.filter((s) => s.finishedAt);
+  if (!finished.length) return { sessions: 0, sets: 0, reps: 0, volume: 0 };
+
+  const logs = await db.query.setLogs.findMany({
+    where: inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
+  });
+  const units = new Map(
+    (
+      await db.query.exercises.findMany({
+        where: inArray(schema.exercises.id, [...new Set(logs.map((l) => l.exerciseId))]),
+      })
+    ).map((e) => [e.id, e.weightUnit]),
+  );
+  const totals = sessionTotals(
+    logs.map((l) => ({ ...l, weightUnit: units.get(l.exerciseId) })),
+  );
+  return { sessions: finished.length, ...totals };
 }

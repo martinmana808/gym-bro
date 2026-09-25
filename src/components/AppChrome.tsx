@@ -10,9 +10,14 @@ type Active = ActiveSessionInput & { sessionId: string };
 
 /** Height of the tab bar itself, before the home-indicator inset. */
 export const NAV_HEIGHT = "3.75rem";
-/** Clearance a page needs under it: tab bar alone, or tab bar plus widget. */
-export const NAV_SPACE = "5rem";
-export const CHROME_SPACE = "10.5rem";
+/**
+ * Clearance a page needs under it. The tab bar is NAV_HEIGHT plus the home
+ * indicator, and the widget adds its own height on top — these have to be at
+ * least that or the last row of a scrolled page hides behind the chrome.
+ */
+export const NAV_SPACE = `calc(${NAV_HEIGHT} + env(safe-area-inset-bottom) + 1rem)`;
+export const WIDGET_HEIGHT = "5.75rem";
+export const CHROME_SPACE = `calc(${NAV_HEIGHT} + ${WIDGET_HEIGHT} + env(safe-area-inset-bottom) + 1rem)`;
 
 /**
  * The app's bottom chrome: the tab bar, with the session widget riding on top
@@ -87,7 +92,11 @@ export function AppChrome() {
             />
           </Link>
         )}
-        <NavBar hasSession={Boolean(active)} sessionId={active?.sessionId ?? null} />
+        <NavBar
+          hasSession={Boolean(active)}
+          sessionId={active?.sessionId ?? null}
+          hasWidget={Boolean(active)}
+        />
       </div>
     </>
   );
@@ -96,9 +105,12 @@ export function AppChrome() {
 export function NavBar({
   hasSession,
   sessionId,
+  hasWidget,
 }: {
   hasSession: boolean;
   sessionId: string | null;
+  /** A widget sits directly above, so the two read as one surface. */
+  hasWidget: boolean;
 }) {
   const pathname = usePathname();
   const tabs = [
@@ -115,8 +127,10 @@ export function NavBar({
 
   return (
     <nav
-      className="border-t border-zinc-800 bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur"
-      style={{ boxShadow: "0 -1px 16px rgb(0 0 0 / 0.5)" }}
+      className={`bg-zinc-950/95 pb-[env(safe-area-inset-bottom)] backdrop-blur ${
+        hasWidget ? "" : "border-t border-zinc-800"
+      }`}
+      style={{ boxShadow: hasWidget ? undefined : "0 -1px 16px rgb(0 0 0 / 0.5)" }}
     >
       <div className="mx-auto flex w-full max-w-md" style={{ height: NAV_HEIGHT }}>
         {tabs.map((t) => {

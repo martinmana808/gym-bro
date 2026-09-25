@@ -37,12 +37,12 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} min-h-[100dvh] antialiased`}
     >
       {/* Installed on iOS there is no browser chrome, and viewportFit:"cover"
           lets us draw under the status bar — so every page needs the top inset
           or the first row of controls sits beneath the clock. */}
-      <body className="flex min-h-full flex-col pt-[env(safe-area-inset-top)] text-zinc-100">
+      <body className="flex min-h-[100dvh] flex-col pt-[env(safe-area-inset-top)] text-zinc-100">
         {/* Padding alone only moves the *start* of the page — scrolled content
             still passes under the translucent iOS status bar. This opaque strip
             sits over that area so the clock and battery stay readable. */}

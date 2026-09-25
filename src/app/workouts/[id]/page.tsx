@@ -6,6 +6,7 @@ import { deleteProgram } from "@/app/actions";
 import { WeekTabs } from "@/components/WeekTabs";
 import { DaysList } from "@/components/DaysList";
 import { HubActions } from "@/components/HubActions";
+import { WorkoutAvatar } from "@/components/WorkoutAvatar";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 
 export const dynamic = "force-dynamic";
@@ -34,6 +35,7 @@ export default async function WorkoutHubPage({
         >
           ←
         </Link>
+        <WorkoutAvatar id={hub.program.id} name={hub.program.name} size={40} />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-2xl font-bold tracking-tight">{hub.program.name}</h1>
         </div>

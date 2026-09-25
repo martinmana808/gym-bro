@@ -6,6 +6,7 @@ import { logSet } from "@/app/actions";
 import { NumberSelect } from "@/components/NumberSelect";
 import { SetGrid } from "@/components/SetGrid";
 import {
+  blockLabel,
   formatLoggedSet,
   type RunnerBlock,
   type RunnerExercise,
@@ -59,24 +60,43 @@ export function FinishedSets({
         />
       ) : (
         <>
-          {exercises.map((e) => {
-            const mine = [...entries.values()]
-              .filter((l) => l.exerciseId === e.id)
-              .sort((a, b) => a.setNumber - b.setNumber);
-            const note = notes.find((n) => n.exerciseId === e.id)?.note;
-            if (!mine.length && !note) return null;
+          {/* One card per block, so a superset reads as a superset here too
+              rather than as a run of unrelated exercises. */}
+          {blocks.map((block) => {
+            const rows = block.exercises
+              .map((e) => ({
+                exercise: e,
+                sets: [...entries.values()]
+                  .filter((l) => l.exerciseId === e.id)
+                  .sort((a, b) => a.setNumber - b.setNumber),
+                note: notes.find((n) => n.exerciseId === e.id)?.note,
+              }))
+              .filter((r) => r.sets.length || r.note);
+            if (!rows.length) return null;
+            const grouped = block.exercises.length > 1;
             return (
               <div
-                key={e.id}
+                key={block.id}
                 className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
               >
-                <div className="flex items-baseline justify-between gap-3">
-                  <span className="font-medium">{e.name}</span>
-                  <span className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
-                    {mine.map((l) => formatLoggedSet(l, e.weightUnit)).join(" · ")}
-                  </span>
+                {grouped && (
+                  <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
+                    {blockLabel(block.exercises.length)}
+                  </p>
+                )}
+                <div className="flex flex-col gap-1.5">
+                  {rows.map((r) => (
+                    <div key={r.exercise.id}>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <span className="font-medium">{r.exercise.name}</span>
+                        <span className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
+                          {r.sets.map((l) => formatLoggedSet(l, r.exercise.weightUnit)).join(" · ")}
+                        </span>
+                      </div>
+                      {r.note && <p className="mt-0.5 text-sm text-zinc-400">{r.note}</p>}
+                    </div>
+                  ))}
                 </div>
-                {note && <p className="mt-1 text-sm text-zinc-400">{note}</p>}
               </div>
             );
           })}

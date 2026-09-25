@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { requireUserId } from "@/auth";
-import { listRecentSessions } from "@/db/queries";
+import { getHistoryTotals, listRecentSessions } from "@/db/queries";
 import { formatClock } from "@/lib/workout";
 
 export const dynamic = "force-dynamic";
@@ -12,7 +12,10 @@ function dayKey(d: Date) {
 
 export default async function HistoryPage() {
   const userId = await requireUserId();
-  const sessions = await listRecentSessions(userId);
+  const [sessions, totals] = await Promise.all([
+    listRecentSessions(userId),
+    getHistoryTotals(userId),
+  ]);
 
   const groups: { label: string; entries: typeof sessions }[] = [];
   for (const s of sessions) {
@@ -28,6 +31,18 @@ export default async function HistoryPage() {
         <p className="text-xs font-semibold uppercase tracking-[0.25em] text-lime-400">🏋️ Gym Bro</p>
         <h1 className="mt-1 text-3xl font-bold tracking-tight">History</h1>
       </header>
+
+      {totals.sessions > 0 && (
+        <section className="grid grid-cols-2 gap-3 text-center">
+          <Tile label="workouts" value={totals.sessions} />
+          <Tile label="sets" value={totals.sets.toLocaleString()} />
+          <Tile label="reps" value={totals.reps.toLocaleString()} />
+          <Tile
+            label="kg lifted"
+            value={totals.volume > 0 ? Math.round(totals.volume).toLocaleString() : "—"}
+          />
+        </section>
+      )}
 
       {sessions.length === 0 && (
         <div className="rounded-2xl border border-dashed border-zinc-700 p-10 text-center text-zinc-400">
@@ -58,13 +73,25 @@ export default async function HistoryPage() {
                 {[s.programName, s.weekName].filter(Boolean).join(" · ")}
               </p>
               <p className="mt-1 text-xs text-zinc-500">
-                {s.setCount} set{s.setCount === 1 ? "" : "s"}
-                {s.volume > 0 && ` · ${Math.round(s.volume).toLocaleString()} kg lifted`}
+                {s.setCount} set{s.setCount === 1 ? "" : "s"} · {s.repCount} rep
+                {s.repCount === 1 ? "" : "s"}
+                {s.volume > 0 && ` · ${Math.round(s.volume).toLocaleString()} kg`}
               </p>
             </Link>
           ))}
         </section>
       ))}
     </main>
+  );
+}
+
+function Tile({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-4">
+      <p className="text-2xl font-bold tabular-nums tracking-tight">{value}</p>
+      <p className="mt-0.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-zinc-500">
+        {label}
+      </p>
+    </div>
   );
 }

@@ -10,6 +10,7 @@ import {
   formatExerciseSessionCell,
   formatTarget,
   formatTargetWeight,
+  sessionTotals,
   formatWeight,
   groupExercisesIntoBlocks,
   itemsToBlocks,
@@ -324,5 +325,45 @@ describe("numberOptions", () => {
   it("ignores a current value that is blank or already present", () => {
     expect(numberOptions(1, 10, 1, { current: "" })).toEqual(numberOptions(1, 10, 1));
     expect(numberOptions(1, 10, 1, { current: "5" })).toEqual(numberOptions(1, 10, 1));
+  });
+});
+
+describe("sessionTotals", () => {
+  it("counts sets, reps and weight × reps", () => {
+    expect(
+      sessionTotals([
+        { weight: 40, reps: 8 },
+        { weight: 40, reps: 8 },
+        { weight: 40, reps: 6 },
+      ]),
+    ).toEqual({ sets: 3, reps: 22, volume: 880 });
+  });
+
+  it("counts bodyweight reps but adds no kilos", () => {
+    expect(sessionTotals([{ weight: null, reps: 10 }])).toEqual({
+      sets: 1,
+      reps: 10,
+      volume: 0,
+    });
+  });
+
+  it("leaves machine bricks out of the kilos, since they aren't kilos", () => {
+    expect(sessionTotals([{ weight: 7, reps: 10, weightUnit: "bricks" }])).toEqual({
+      sets: 1,
+      reps: 10,
+      volume: 0,
+    });
+  });
+
+  it("ignores a set with no reps recorded", () => {
+    expect(sessionTotals([{ weight: 40, reps: null }])).toEqual({
+      sets: 1,
+      reps: 0,
+      volume: 0,
+    });
+  });
+
+  it("is all zeroes for nothing logged", () => {
+    expect(sessionTotals([])).toEqual({ sets: 0, reps: 0, volume: 0 });
   });
 });

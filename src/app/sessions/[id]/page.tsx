@@ -6,7 +6,7 @@ import { deleteSession } from "@/app/actions";
 import { SessionRunner, type LogEntry } from "@/components/SessionRunner";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { FinishedSets } from "@/components/FinishedSets";
-import { formatClock } from "@/lib/workout";
+import { formatClock, sessionTotals } from "@/lib/workout";
 
 export const dynamic = "force-dynamic";
 
@@ -51,6 +51,8 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   // Finished: summary view. Time spent paused doesn't count as workout time.
   const durationSeconds =
     (session.finishedAt.getTime() - session.startedAt.getTime() - session.pausedMs) / 1000;
+  const unitOf = new Map(structure.blocks.flatMap((b) => b.exercises).map((e) => [e.id, e.weightUnit]));
+  const totals = sessionTotals(logs.map((l) => ({ ...l, weightUnit: unitOf.get(l.exerciseId) })));
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pb-10 pt-6">
@@ -75,20 +77,13 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       </header>
 
       <div className="grid grid-cols-2 gap-3 text-center">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-          <p className="text-3xl font-bold tabular-nums tracking-tight">
-            {durationSeconds > 0 ? formatClock(durationSeconds) : "—"}
-          </p>
-          <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-zinc-400">
-            duration
-          </p>
-        </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-          <p className="text-3xl font-bold tabular-nums tracking-tight">{logs.length}</p>
-          <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-zinc-400">
-            sets logged
-          </p>
-        </div>
+        <Tile label="duration" value={durationSeconds > 0 ? formatClock(durationSeconds) : "—"} />
+        <Tile label="sets" value={totals.sets} />
+        <Tile label="reps" value={totals.reps} />
+        <Tile
+          label="kg lifted"
+          value={totals.volume > 0 ? Math.round(totals.volume).toLocaleString() : "—"}
+        />
       </div>
 
       <FinishedSets
@@ -107,5 +102,14 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         </ConfirmSubmit>
       </form>
     </main>
+  );
+}
+
+function Tile({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
+      <p className="text-3xl font-bold tabular-nums tracking-tight">{value}</p>
+      <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-zinc-400">{label}</p>
+    </div>
   );
 }

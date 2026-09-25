@@ -285,3 +285,24 @@ export function groupExercisesIntoBlocks<T extends { supersetKey: string | null 
   }
   return groups;
 }
+
+export type SessionTotals = { sets: number; reps: number; volume: number };
+
+/**
+ * What a session (or a pile of them) added up to. Volume is weight × reps, so
+ * bodyweight and machine-brick work contribute reps but no kilos — there's no
+ * honest way to price a brick in kg.
+ */
+export function sessionTotals(
+  logs: { weight: number | null; reps: number | null; weightUnit?: WeightUnit }[],
+): SessionTotals {
+  let reps = 0;
+  let volume = 0;
+  for (const l of logs) {
+    reps += l.reps ?? 0;
+    if (l.weight != null && l.reps != null && (l.weightUnit ?? "kg") === "kg") {
+      volume += l.weight * l.reps;
+    }
+  }
+  return { sets: logs.length, reps, volume };
+}
