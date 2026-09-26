@@ -1,37 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { workoutAvatar } from "./avatar";
+import { ROSTER, workoutFighter } from "./avatar";
 
-describe("workoutAvatar", () => {
+describe("workoutFighter", () => {
   it("is stable for the same id", () => {
-    expect(workoutAvatar("abc", "Pequeño Putarraco")).toEqual(
-      workoutAvatar("abc", "Pequeño Putarraco"),
+    expect(workoutFighter("abc").slug).toBe(workoutFighter("abc").slug);
+  });
+
+  it("spreads workouts across the roster", () => {
+    const slugs = new Set(
+      Array.from({ length: 60 }, (_, i) => workoutFighter(`workout-${i}`).slug),
     );
+    expect(slugs.size).toBeGreaterThan(5);
   });
 
-  it("gives different workouts different looks", () => {
-    const seeds = ["a", "b", "c", "d", "e", "f", "g", "h"];
-    const looks = seeds.map((s) => workoutAvatar(s).background + workoutAvatar(s).glyph);
-    expect(new Set(looks).size).toBeGreaterThan(5);
+  it("only ever returns someone from the roster", () => {
+    const known = new Set(ROSTER.map((f) => f.slug));
+    for (let i = 0; i < 50; i++) expect(known.has(workoutFighter(`w${i}`).slug)).toBe(true);
   });
 
-  it("ignores the name when an id is present, so renaming keeps the avatar", () => {
-    expect(workoutAvatar("abc", "One").background).toBe(workoutAvatar("abc", "Two").background);
+  it("still picks someone for an empty id", () => {
+    expect(workoutFighter("").name).toBeTruthy();
   });
 
-  it("takes initials from the first and last word", () => {
-    expect(workoutAvatar("x", "Pequeño Putarraco").initials).toBe("PP");
-    expect(workoutAvatar("x", "Upper").initials).toBe("UP");
-    expect(workoutAvatar("x", "Push Pull Legs").initials).toBe("PL");
-  });
-
-  it("copes with no name at all", () => {
-    expect(workoutAvatar("x", "").initials).toBe("??");
-    expect(workoutAvatar("x", "   ").initials).toBe("??");
-  });
-
-  it("still produces something for an empty seed", () => {
-    const a = workoutAvatar("", "");
-    expect(a.glyph).toBeTruthy();
-    expect(a.background).toContain("linear-gradient");
+  it("has a complete, unique roster", () => {
+    expect(ROSTER).toHaveLength(9);
+    expect(new Set(ROSTER.map((f) => f.slug)).size).toBe(9);
+    for (const f of ROSTER) {
+      expect(f.initials).toMatch(/^[A-Z]{2}$/);
+      expect(f.background).toContain("gradient");
+      expect(f.border).toMatch(/^#[0-9a-f]{6}$/i);
+    }
   });
 });
