@@ -101,11 +101,11 @@ export function WeekTargetsEditor({
         return (
           <div key={block.id} className="flex flex-col gap-2">
             {section && (
-              <p className="pl-4 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
+              <p className="pl-4 section-label">
                 {section}
               </p>
             )}
-            <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+            <div className="flex flex-col gap-4 card p-4">
               {block.exercises.length > 1 && (
                 <p className="-mb-2 text-[11px] font-medium uppercase tracking-wider text-zinc-400">
                   {blockLabel(block.exercises.length)}
@@ -202,7 +202,7 @@ export function WeekTargetsEditor({
         <button
           onClick={save}
           disabled={saving}
-          className="flex-1 rounded-2xl bg-lime-400 py-3 font-bold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
+          className="flex-1 rounded-2xl bg-lime-400 py-3 font-bold text-zinc-950 transition hover:bg-lime-300 disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save week"}
         </button>

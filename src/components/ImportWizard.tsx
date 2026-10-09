@@ -49,12 +49,12 @@ export function ImportWizard() {
             type="text"
             value={programName}
             onChange={(e) => setProgramName(e.target.value)}
-            className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-lime-400 focus:outline-none"
+            className="card p-3 text-sm text-zinc-200 placeholder:text-zinc-600 focus:border-lime-400 focus:outline-none"
             placeholder="My Split"
           />
         </label>
         <textarea
-          className="h-56 w-full rounded-2xl border border-zinc-800 bg-zinc-900/60 p-3 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-lime-400 focus:outline-none"
+          className="h-56 w-full card p-3 font-mono text-xs text-zinc-200 placeholder:text-zinc-600 focus:border-lime-400 focus:outline-none"
           value={text}
           onChange={(e) => setText(e.target.value)}
           placeholder={
@@ -80,7 +80,7 @@ export function ImportWizard() {
         <button
           disabled={!text.trim()}
           onClick={() => setResult(parseWeeksCsv(text))}
-          className="rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
+          className="rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 transition hover:bg-lime-300 disabled:opacity-50"
         >
           Preview import
         </button>
@@ -100,7 +100,7 @@ export function ImportWizard() {
         {result.weekNames.length === 1 ? "" : "s"} ({result.weekNames.join(", ")})
       </p>
       {result.days.map((day, di) => (
-        <section key={di} className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+        <section key={di} className="card p-4">
           <h2 className="font-semibold tracking-tight">{day.name}</h2>
           <div className="mt-3 flex flex-col gap-3">
             {day.exercises.map((e, ei) => (
@@ -118,7 +118,7 @@ export function ImportWizard() {
                   {e.perWeek.map((t, wi) => (
                     <span
                       key={wi}
-                      className="rounded-lg bg-zinc-800/80 px-2 py-1 text-xs tabular-nums text-zinc-300"
+                      className="rounded-lg bg-zinc-800/80 px-2 py-1 text-xs metric text-zinc-300"
                       title={result.weekNames[wi]}
                     >
                       W{wi + 1}: {targetLabel(t)}
@@ -155,7 +155,7 @@ export function ImportWizard() {
               }
             })
           }
-          className="flex-1 rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
+          className="flex-1 rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 transition hover:bg-lime-300 disabled:opacity-50"
         >
           {pending ? "Importing…" : "Import"}
         </button>

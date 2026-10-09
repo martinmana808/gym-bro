@@ -82,7 +82,7 @@ export function usePush(): PushState {
       if (perm !== "granted") {
         setError(
           perm === "denied"
-            ? "Notifications are blocked. Enable them for Gym Bro in iOS Settings › Notifications."
+            ? "Notifications are blocked. Enable them for Sharp in iOS Settings › Notifications."
             : "Notification permission was dismissed.",
         );
         return;

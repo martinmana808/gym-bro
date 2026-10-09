@@ -107,8 +107,8 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
 
 function Tile({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">
-      <p className="text-3xl font-bold tabular-nums tracking-tight">{value}</p>
+    <div className="card p-5">
+      <p className="display-num text-3xl font-bold">{value}</p>
       <p className="mt-1 text-xs font-medium uppercase tracking-[0.15em] text-zinc-400">{label}</p>
     </div>
   );

@@ -43,7 +43,7 @@ export function FinishedSets({
         <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-400">Sets</h2>
         <button
           onClick={() => setEditMode((v) => !v)}
-          className="text-sm text-zinc-400 transition hover:text-lime-400"
+          className="text-sm text-zinc-400 transition hover:text-zinc-100"
         >
           {editMode ? "Done editing" : "Edit sets"}
         </button>
@@ -77,7 +77,7 @@ export function FinishedSets({
             return (
               <div
                 key={block.id}
-                className="rounded-xl border border-zinc-800 bg-zinc-950 px-4 py-3"
+                className="well px-4 py-3"
               >
                 {grouped && (
                   <p className="mb-2 text-[11px] font-semibold uppercase tracking-wider text-zinc-500">
@@ -89,7 +89,7 @@ export function FinishedSets({
                     <div key={r.exercise.id}>
                       <div className="flex items-baseline justify-between gap-3">
                         <span className="font-medium">{r.exercise.name}</span>
-                        <span className="whitespace-nowrap text-sm tabular-nums text-zinc-300">
+                        <span className="whitespace-nowrap text-sm metric text-zinc-300">
                           {r.sets.map((l) => formatLoggedSet(l, r.exercise.weightUnit)).join(" · ")}
                         </span>
                       </div>
@@ -155,7 +155,7 @@ function SetEditor({
         className="mx-auto w-full max-w-md rounded-t-3xl border-t border-zinc-800 bg-zinc-950 p-5 pb-[max(1.5rem,env(safe-area-inset-bottom))]"
         onClick={(e) => e.stopPropagation()}
       >
-        <p className="text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
+        <p className="section-label">
           Set {setNumber}
         </p>
         <h3 className="mt-1 text-xl font-bold tracking-tight">{exercise.name}</h3>
@@ -198,7 +198,7 @@ function SetEditor({
               hitTarget: !!entry?.hitTarget && reps !== "" && Number(reps) === entry.reps,
             })
           }
-          className="mt-4 w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98]"
+          className="mt-4 w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 transition hover:bg-lime-300"
         >
           Save set
         </button>

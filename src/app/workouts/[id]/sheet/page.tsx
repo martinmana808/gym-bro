@@ -28,7 +28,7 @@ export default async function SheetPage({ params }: { params: Promise<{ id: stri
         </div>
         <a
           href={`/workouts/${id}/sheet/export`}
-          className="shrink-0 rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-lime-400 hover:text-lime-400"
+          className="shrink-0 rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-600 hover:text-zinc-100"
         >
           ⬇ Export CSV
         </a>
@@ -53,7 +53,7 @@ export default async function SheetPage({ params }: { params: Promise<{ id: stri
                     <th
                       key={w.position}
                       colSpan={1 + w.sessions.length}
-                      className="border-l border-zinc-800 px-3 py-1.5 text-center text-xs font-semibold uppercase tracking-wider text-lime-400"
+                      className="border-l border-zinc-800 px-3 py-1.5 text-center section-label"
                     >
                       {w.name}
                     </th>
@@ -87,7 +87,7 @@ export default async function SheetPage({ params }: { params: Promise<{ id: stri
                         <tr>
                           <td
                             colSpan={totalCols}
-                            className="border-l-2 border-lime-400 bg-zinc-950 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.15em] text-lime-400"
+                            className="border-l-2 border-lime-400 bg-zinc-950 px-3 py-1 section-label"
                           >
                             {row.sectionName}
                           </td>
@@ -113,11 +113,11 @@ export default async function SheetPage({ params }: { params: Promise<{ id: stri
                         </td>
                         {row.byWeek.map((c, wi) => (
                           <Fragment key={wi}>
-                            <td className="border-l border-zinc-800 px-3 py-2 tabular-nums text-zinc-400">
+                            <td className="border-l border-zinc-800 px-3 py-2 metric text-zinc-400">
                               {c?.target ?? ""}
                             </td>
                             {day.weeks[wi].sessions.map((s, si) => (
-                              <td key={s.id} className="px-3 py-2 tabular-nums text-zinc-300">
+                              <td key={s.id} className="px-3 py-2 metric text-zinc-300">
                                 {c?.sessions[si] ?? ""}
                               </td>
                             ))}

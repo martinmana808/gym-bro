@@ -45,7 +45,7 @@ export function NumberSelect({
         onClick={() => setOpen(true)}
         className={`${className ?? selectField} flex items-center justify-between gap-2`}
       >
-        <span className="tabular-nums">{value === "" ? blankLabel : value}</span>
+        <span className="metric">{value === "" ? blankLabel : value}</span>
         <span aria-hidden className="text-xs text-zinc-400">
           ⌄
         </span>

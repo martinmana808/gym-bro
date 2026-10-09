@@ -15,10 +15,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Gym Bro",
+  title: "Sharp",
   description: "Your workout routine, tracked set by set.",
   manifest: "/manifest.webmanifest",
-  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Gym Bro" },
+  appleWebApp: { capable: true, statusBarStyle: "black-translucent", title: "Sharp" },
   icons: { icon: "/icon-192.png", apple: "/apple-icon.png" },
 };
 

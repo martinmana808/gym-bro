@@ -1,4 +1,4 @@
-// Gym Bro service worker. Its only job is push: iOS won't deliver a rest-timer
+// Sharp service worker. Its only job is push: iOS won't deliver a rest-timer
 // notification to a backgrounded PWA any other way. There is deliberately no
 // fetch/caching handler — the app is server-rendered and per-user, so a stale
 // cache would do more harm than an offline screen would do good.
@@ -11,9 +11,9 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data ? event.data.json() : {};
   } catch {
-    data = { title: "Gym Bro", body: event.data ? event.data.text() : "" };
+    data = { title: "Sharp", body: event.data ? event.data.text() : "" };
   }
-  const title = data.title || "Gym Bro";
+  const title = data.title || "Sharp";
   event.waitUntil(
     self.registration.showNotification(title, {
       body: data.body || "",

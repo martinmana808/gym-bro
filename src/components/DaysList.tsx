@@ -30,7 +30,7 @@ export function DaysList({
         />
       ))}
       <form action={addDay.bind(null, programId)}>
-        <button className="w-full rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400">
+        <button className="w-full rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100">
           + Add day
         </button>
       </form>
@@ -78,7 +78,7 @@ function DayRow({
         {day.unfinishedSessionId ? (
           <Link
             href={`/sessions/${day.unfinishedSessionId}`}
-            className="flex-1 rounded-xl bg-amber-400 py-2 text-center font-bold text-zinc-950 transition hover:bg-amber-300 active:scale-[0.98]"
+            className="flex-1 rounded-xl bg-amber-400 py-2 text-center font-bold text-zinc-950 transition hover:bg-amber-300"
           >
             Resume
           </Link>
@@ -86,7 +86,7 @@ function DayRow({
           <form action={startSession.bind(null, day.id, day.cellVariationId ?? undefined)} className="flex-1">
             <button
               disabled={!day.cellVariationId}
-              className="w-full rounded-xl bg-lime-400 py-2 font-bold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-40"
+              className="w-full rounded-xl bg-lime-400 py-2 font-bold text-zinc-950 transition hover:bg-lime-300 disabled:opacity-40"
             >
               Start
             </button>

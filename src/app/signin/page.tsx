@@ -23,7 +23,7 @@ export default async function SignInPage() {
               await signIn("google", { redirectTo: "/workouts" });
             }}
           >
-            <button className="w-full rounded-2xl bg-zinc-800 py-3.5 font-bold text-zinc-950 transition hover:bg-zinc-800 active:scale-[0.98]">
+            <button className="w-full rounded-2xl bg-zinc-800 py-3.5 font-bold text-zinc-950 transition hover:bg-zinc-800">
               Continue with Google
             </button>
           </form>
@@ -35,7 +35,7 @@ export default async function SignInPage() {
               await signIn("dev", { redirectTo: "/workouts" });
             }}
           >
-            <button className="w-full rounded-2xl border border-zinc-700 py-3.5 font-semibold text-zinc-200 transition hover:border-lime-400 hover:text-lime-400 active:scale-[0.98]">
+            <button className="w-full rounded-2xl border border-zinc-700 py-3.5 font-semibold text-zinc-200 transition hover:border-zinc-600 hover:text-zinc-100">
               Dev login (local only)
             </button>
           </form>

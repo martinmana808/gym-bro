@@ -13,7 +13,7 @@ export function NotificationSettings() {
       <Card>
         <Title>Rest timer notifications</Title>
         <p className="mt-1 text-sm text-zinc-400">
-          iOS only allows notifications once Gym Bro is on your home screen. Tap{" "}
+          iOS only allows notifications once Sharp is on your home screen. Tap{" "}
           <span className="text-zinc-200">Share ⎋</span> →{" "}
           <span className="text-zinc-200">Add to Home Screen</span>, then open it from there.
         </p>
@@ -53,7 +53,7 @@ export function NotificationSettings() {
       {push.subscribed && (
         <button
           onClick={async () => setSent(await push.sendTest())}
-          className="mt-3 text-sm text-zinc-400 transition hover:text-lime-400"
+          className="mt-3 text-sm text-zinc-400 transition hover:text-zinc-100"
         >
           {sent ? "Sent — check your lock screen" : "Send a test notification"}
         </button>
@@ -64,7 +64,7 @@ export function NotificationSettings() {
 }
 
 const Card = ({ children }: { children: React.ReactNode }) => (
-  <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5">{children}</div>
+  <div className="card p-5">{children}</div>
 );
 
 const Title = ({ children }: { children: React.ReactNode }) => (

@@ -9,12 +9,131 @@
    autofill consistent regardless of the device's color scheme. */
 :root {
   color-scheme: dark;
+
+  /* A ladder of surfaces, not one translucent grey. Each step is a real
+     colour so nothing muddies when panels overlap. */
+  --canvas: #08080a;
+  --surface: #121214;
+  --surface-raised: #18181b;
+  --surface-sunken: #0d0d0f;
+
+  /* Hairlines. Light-on-dark reads cleaner than a grey border colour. */
+  --line: rgb(255 255 255 / 0.07);
+  --line-strong: rgb(255 255 255 / 0.13);
+
+  --accent: #a3e635;
+  --accent-ink: #0a0a0a;
 }
 
 body {
-  background-color: #09090b;
-  background-image: radial-gradient(65rem 45rem at 50% -12rem, rgb(163 230 53 / 0.06), transparent 70%);
-  background-repeat: no-repeat;
+  background-color: var(--canvas);
+}
+
+/* ── Type ──────────────────────────────────────────────────────────────
+   Numbers are the content of a training app. `.metric` keeps the body face
+   but locks the digits to one width, so a ticking clock or a column of
+   weights never jitters — safe to put on a phrase like "3 sets × 10 reps".
+   `.display-num` is for bare numerals that should read as an instrument
+   readout; monospace on a phrase with words in it just looks clumsy. */
+.metric {
+  font-variant-numeric: tabular-nums;
+}
+
+.display-num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+.page-title {
+  font-size: 1.75rem;
+  line-height: 1.1;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.section-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #71717a;
+}
+
+/* Above an input, where the value below is the loud part. */
+.field-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: #8b8b93;
+}
+
+/* ── Surfaces ──────────────────────────────────────────────────────── */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+}
+
+/* A card you can act on. The lift is a border change, not a glow. */
+.card-tap {
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+.card-tap:active {
+  background: var(--surface-raised);
+}
+
+.well {
+  background: var(--surface-sunken);
+  border: 1px solid var(--line);
+  border-radius: 0.75rem;
+}
+
+/* ── Buttons ───────────────────────────────────────────────────────────
+   Green is reserved for "do the thing" and "this is live". Everything
+   else is a quiet outline, so the one green button on a screen is
+   unmistakably the next step. */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  font-weight: 600;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.btn:active:not(:disabled) {
+  transform: scale(0.985);
+}
+.btn:disabled {
+  opacity: 0.4;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.btn-primary:hover:not(:disabled) {
+  background: #b9f04f;
+}
+
+.btn-ghost {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: #d4d4d8;
+}
+.btn-ghost:hover:not(:disabled) {
+  border-color: rgb(255 255 255 / 0.25);
+  background: var(--surface-raised);
+}
+
+.btn-quiet {
+  background: var(--surface-raised);
+  color: #e4e4e7;
+}
+.btn-quiet:hover:not(:disabled) {
+  background: #232327;
 }
 
 /* Number inputs get custom stepper buttons; hide the tiny native spinners. */

@@ -44,7 +44,7 @@ export function SessionWidget({
         <div className="min-w-0 flex-1">
           <p className="truncate text-xl font-bold tracking-tight text-zinc-100">
             {view.title}
-            {view.timer && <span className={`ml-2 tabular-nums ${accent.text}`}>{view.timer}</span>}
+            {view.timer && <span className={`display-num ml-2 ${accent.text}`}>{view.timer}</span>}
           </p>
           <p className="mt-0.5 flex items-baseline gap-2.5 text-sm">
             <span className="truncate text-zinc-300">{view.subtitle}</span>

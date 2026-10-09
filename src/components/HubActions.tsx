@@ -42,7 +42,7 @@ export function HubActions({ programId, name }: { programId: string; name: strin
       </form>
       <div className="flex items-center gap-3 text-xs text-zinc-400">
         <form action={duplicateProgram.bind(null, programId)}>
-          <button className="transition hover:text-lime-400">Duplicate</button>
+          <button className="transition hover:text-zinc-100">Duplicate</button>
         </form>
         <button onClick={() => setOpen(false)} className="transition hover:text-zinc-300">
           Cancel

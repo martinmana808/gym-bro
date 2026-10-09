@@ -39,7 +39,7 @@ const Row = memo(function Row({
       {/* Transform lives on an inner node so scroll-snap still measures the
           untransformed row box (otherwise snapping drifts). */}
       <div
-        className={`grid h-full place-items-center text-[28px] tabular-nums ${TIER_CLASS[tier]}`}
+        className={`grid h-full place-items-center text-[28px] metric ${TIER_CLASS[tier]}`}
         style={{
           transform: `translateY(${translateY}px) rotateX(${rot}deg)`,
           transformOrigin: "center center",
@@ -157,7 +157,7 @@ export function WheelPicker({
           <button
             onClick={onClose}
             aria-label="Done"
-            className="grid size-11 place-items-center rounded-full bg-lime-400 text-xl font-bold text-zinc-950 transition hover:bg-lime-300 active:scale-[0.97]"
+            className="grid size-11 place-items-center rounded-full bg-lime-400 text-xl font-bold text-zinc-950 transition hover:bg-lime-300"
           >
             ✓
           </button>

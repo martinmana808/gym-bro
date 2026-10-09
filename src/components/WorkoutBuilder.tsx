@@ -156,7 +156,7 @@ export function WorkoutBuilder({
               className="flex items-center gap-2 border-l-2 border-lime-400 bg-lime-400/5 py-2 pl-3 pr-2"
             >
               <input
-                className="w-full flex-1 bg-transparent text-xs font-semibold uppercase tracking-[0.15em] text-lime-400 placeholder:text-lime-400/40 focus:outline-none"
+                className="w-full flex-1 bg-transparent section-label placeholder:text-lime-400/40 focus:outline-none"
                 value={item.name}
                 onChange={(ev) =>
                   setItems((its) =>
@@ -211,10 +211,10 @@ export function WorkoutBuilder({
         return (
           <section
             key={block.key}
-            className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4"
+            className="card p-4"
           >
             <header className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
+              <h3 className="section-label">
                 {blockNumber}. {blockLabel(block.exercises.length)}
               </h3>
               <div className="flex items-center gap-3">
@@ -465,7 +465,7 @@ export function WorkoutBuilder({
       <div className="flex gap-3">
         <button
           type="button"
-          className="flex-1 rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
+          className="flex-1 rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
           onClick={() =>
             setItems((its) => [
               ...its,
@@ -477,7 +477,7 @@ export function WorkoutBuilder({
         </button>
         <button
           type="button"
-          className="flex-1 rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
+          className="flex-1 rounded-2xl border border-dashed border-zinc-700 py-4 font-medium text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
           onClick={() =>
             setItems((its) => [...its, { kind: "divider", key: nextKey(), name: "" }])
           }
@@ -493,7 +493,7 @@ export function WorkoutBuilder({
           type="button"
           disabled={pending}
           onClick={save}
-          className="mx-auto block w-full max-w-md rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98] disabled:opacity-50"
+          className="mx-auto block w-full max-w-md rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 transition hover:bg-lime-300 disabled:opacity-50"
         >
           {pending ? "Saving…" : variationId ? "Save changes" : "Create workout"}
         </button>

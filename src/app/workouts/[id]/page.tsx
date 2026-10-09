@@ -6,7 +6,6 @@ import { deleteProgram } from "@/app/actions";
 import { WeekTabs } from "@/components/WeekTabs";
 import { DaysList } from "@/components/DaysList";
 import { HubActions } from "@/components/HubActions";
-import { WorkoutAvatar } from "@/components/WorkoutAvatar";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +34,6 @@ export default async function WorkoutHubPage({
         >
           ←
         </Link>
-        <WorkoutAvatar id={hub.program.id} name={hub.program.name} size={40} />
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-2xl font-bold tracking-tight">{hub.program.name}</h1>
         </div>
@@ -58,7 +56,7 @@ export default async function WorkoutHubPage({
 
       <Link
         href={`/workouts/${hub.program.id}/sheet`}
-        className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 text-center text-sm font-medium text-zinc-300 transition hover:border-zinc-700"
+        className="card px-4 py-3 text-center text-sm font-medium text-zinc-300 transition hover:border-zinc-700"
       >
         📊 Spreadsheet view — all weeks &amp; sessions
       </Link>

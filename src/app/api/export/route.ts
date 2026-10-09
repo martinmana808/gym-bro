@@ -81,7 +81,7 @@ export async function GET() {
   return new Response([header, ...rows].join("\n"), {
     headers: {
       "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": 'attachment; filename="gym-bro-export.csv"',
+      "Content-Disposition": 'attachment; filename="sharp-export.csv"',
     },
   });
 }

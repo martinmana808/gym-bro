@@ -85,17 +85,19 @@ export default async function DayDetailPage({
         <Link
           href={`/workouts/${programId}`}
           aria-label="Back to workout"
-          className="grid size-10 shrink-0 place-items-center rounded-full border border-zinc-800 bg-zinc-900/60 text-lg text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
+          className="btn btn-ghost size-10 shrink-0 rounded-full text-lg"
         >
           ←
         </Link>
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-2xl font-bold tracking-tight">{workout.name}</h1>
-          <p className="text-sm text-zinc-400">Default rest: {formatSeconds(workout.defaultRestSeconds)}</p>
+          <p className="text-sm text-zinc-500">
+            Rest <span className="metric">{formatSeconds(workout.defaultRestSeconds)}</span>
+          </p>
         </div>
         <Link
           href={`/workouts/${programId}/days/${dayId}/edit?week=${selectedWeek}`}
-          className="rounded-full border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:border-zinc-600"
+          className="btn btn-ghost rounded-full px-4 py-2 text-sm"
         >
           Edit
         </Link>
@@ -112,7 +114,7 @@ export default async function DayDetailPage({
           bottom of the screen already says so and links straight into it. */}
       {!unfinished && (
         <form action={startSession.bind(null, dayId, cellVariationId)}>
-          <button className="w-full rounded-2xl bg-lime-400 py-3.5 font-bold text-zinc-950 shadow-lg shadow-lime-400/15 transition hover:bg-lime-300 active:scale-[0.98]">
+          <button className="btn btn-primary w-full py-3.5 text-base">
             Start workout
           </button>
         </form>
@@ -129,15 +131,20 @@ export default async function DayDetailPage({
                 {/* Same left padding as the cards below, so the whole plan
                     column lines up whether or not a block is a superset. */}
                 {showHeader && (
-                  <p className="mb-2.5 mt-2 pl-4 text-xs font-semibold uppercase tracking-[0.15em] text-lime-400">
+                  <p className="section-label mb-2 mt-3 pl-1">
                     {section}
                   </p>
                 )}
-                <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4">
+                <div className="card divide-y divide-white/5">
                   {block.exercises.map((e) => (
-                    <div key={e.id} className="flex items-baseline justify-between gap-3 py-1">
-                      <span className="font-medium">{e.name}</span>
-                      <span className="whitespace-nowrap text-sm text-zinc-400">
+                    <div
+                      key={e.id}
+                      className="flex items-baseline justify-between gap-4 px-4 py-2.5"
+                    >
+                      <span className="min-w-0 flex-1 truncate text-[0.9375rem] text-zinc-300">
+                        {e.name}
+                      </span>
+                      <span className="metric whitespace-nowrap text-sm text-zinc-100">
                         {formatTarget(e)}
                         {e.targetWeight != null && ` · ${formatTargetWeight(e)}`}
                         {e.restOverrideSeconds != null && ` · rest ${formatSeconds(e.restOverrideSeconds)}`}
@@ -175,9 +182,9 @@ export default async function DayDetailPage({
                       : 0;
                     return (
                       <th key={s.id} className="px-3 py-2 font-medium align-top">
-                        <Link href={`/sessions/${s.id}`} className="block transition hover:text-lime-400">
+                        <Link href={`/sessions/${s.id}`} className="block transition hover:text-zinc-100">
                           {s.startedAt.toLocaleDateString(undefined, { month: "short", day: "numeric" })}
-                          <span className="block text-[11px] font-normal tabular-nums text-zinc-400">
+                          <span className="block text-[11px] font-normal metric text-zinc-400">
                             {durationSeconds > 0 ? formatClock(durationSeconds) : "—"}
                           </span>
                         </Link>
@@ -199,7 +206,7 @@ export default async function DayDetailPage({
                         <tr className="border-b border-zinc-800 bg-zinc-950">
                           <td
                             colSpan={3 + columns.length}
-                            className="border-l-2 border-lime-400 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-lime-400"
+                            className="border-l-2 border-lime-400 px-3 py-1.5 section-label"
                           >
                             {section}
                           </td>
@@ -215,14 +222,14 @@ export default async function DayDetailPage({
                           )}
                         </td>
                         <td className="px-3 py-2.5 text-zinc-400">{formatTarget(e)}</td>
-                        <td className="px-3 py-2.5 tabular-nums text-zinc-300">
+                        <td className="px-3 py-2.5 metric text-zinc-300">
                           {formatCurrentWeight(currentWeight(e.id), e.weightUnit)}
                         </td>
                         {columns.map((s) => {
                           const logs = (history.logsBySession[s.id] ?? []).filter((l) => l.exerciseId === e.id);
                           const note = (history.notesBySession[s.id] ?? []).find((n) => n.exerciseId === e.id)?.note;
                           return (
-                            <td key={s.id} className="whitespace-nowrap px-3 py-2.5 tabular-nums">
+                            <td key={s.id} className="whitespace-nowrap px-3 py-2.5 metric">
                               {formatExerciseSessionCell(e, logs)}
                               {note && (
                                 <span title={note} className="ml-0.5 cursor-help text-lime-400">

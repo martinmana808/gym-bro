@@ -26,11 +26,8 @@ export default async function HistoryPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pt-8">
-      <header>
-        <p className="text-xs font-semibold uppercase tracking-[0.25em] text-lime-400">🏋️ Gym Bro</p>
-        <h1 className="mt-1 text-3xl font-bold tracking-tight">History</h1>
-      </header>
+    <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pt-6">
+      <h1 className="page-title">History</h1>
 
       {totals.sessions > 0 && (
         <section className="grid grid-cols-2 gap-3 text-center">
@@ -54,18 +51,18 @@ export default async function HistoryPage() {
 
       {groups.map((g) => (
         <section key={g.label} className="flex flex-col gap-2">
-          <h2 className="text-xs font-semibold uppercase tracking-[0.15em] text-zinc-400">
+          <h2 className="section-label">
             {g.label}
           </h2>
           {g.entries.map((s) => (
             <Link
               key={s.sessionId}
               href={`/sessions/${s.sessionId}`}
-              className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-4 transition hover:border-zinc-700"
+              className="card p-4 transition hover:border-zinc-700"
             >
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="truncate font-semibold tracking-tight">{s.dayName}</h3>
-                <span className="shrink-0 text-sm tabular-nums text-zinc-400">
+                <span className="display-num shrink-0 text-sm text-zinc-400">
                   {formatClock(s.durationSeconds)}
                 </span>
               </div>
@@ -87,11 +84,9 @@ export default async function HistoryPage() {
 
 function Tile({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-3 py-4">
-      <p className="text-2xl font-bold tabular-nums tracking-tight">{value}</p>
-      <p className="mt-0.5 text-[0.7rem] font-medium uppercase tracking-[0.12em] text-zinc-500">
-        {label}
-      </p>
+    <div className="card px-3 py-3.5">
+      <p className="display-num text-[1.6rem] font-semibold leading-none text-zinc-100">{value}</p>
+      <p className="section-label mt-1.5">{label}</p>
     </div>
   );
 }

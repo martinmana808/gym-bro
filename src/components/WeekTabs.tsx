@@ -40,7 +40,7 @@ export function WeekTabs({
           ))}
           <form action={addWeek.bind(null, programId, selectedWeek)}>
             <button
-              className="rounded-full border border-dashed border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 transition hover:border-lime-400 hover:text-lime-400"
+              className="rounded-full border border-dashed border-zinc-700 px-3 py-1.5 text-sm text-zinc-400 transition hover:border-zinc-600 hover:text-zinc-100"
               title="Copy the current week forward"
             >
               + Week
@@ -51,7 +51,7 @@ export function WeekTabs({
         {active && !editing && (
           <button
             onClick={() => setEditing(true)}
-            className="shrink-0 rounded-full border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 transition hover:border-zinc-600"
+            className="shrink-0 rounded-full px-2.5 py-1.5 text-xs font-medium text-zinc-500 transition hover:text-zinc-200"
           >
             Edit
           </button>
