@@ -11,7 +11,7 @@ export async function POST() {
   if (!pushEnabled()) return Response.json({ ok: false, delivered: 0, reason: "push-not-configured" });
 
   const delivered = await sendPushToUser(userId, {
-    title: "Sharp",
+    title: "SHARP",
     body: "Notifications are working. Now go lift something.",
     tag: "test",
     url: "/",

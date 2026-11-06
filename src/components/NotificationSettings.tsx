@@ -13,7 +13,7 @@ export function NotificationSettings() {
       <Card>
         <Title>Rest timer notifications</Title>
         <p className="mt-1 text-sm text-zinc-400">
-          iOS only allows notifications once Sharp is on your home screen. Tap{" "}
+          iOS only allows notifications once SHARP is on your home screen. Tap{" "}
           <span className="text-zinc-200">Share ⎋</span> →{" "}
           <span className="text-zinc-200">Add to Home Screen</span>, then open it from there.
         </p>

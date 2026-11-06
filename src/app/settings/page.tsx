@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { NotificationSettings } from "@/components/NotificationSettings";
+import { AlarmSettings } from "@/components/AlarmSettings";
 
 export const dynamic = "force-dynamic";
 
@@ -41,6 +42,8 @@ export default async function SettingsPage() {
 
       <NotificationSettings />
 
+      <AlarmSettings />
+
       <section className="card p-4">
         <h2 className="font-semibold tracking-tight">Your data</h2>
         <p className="mt-1 text-sm text-zinc-400">
@@ -66,7 +69,7 @@ export default async function SettingsPage() {
         <h2 className="font-semibold tracking-tight">Help</h2>
         <dl className="mt-3 flex flex-col gap-3 text-sm">
           <div>
-            <dt className="font-medium">Put Sharp on your home screen</dt>
+            <dt className="font-medium">Put SHARP on your home screen</dt>
             <dd className="mt-0.5 text-zinc-400">
               Open the app in Safari, tap <span className="text-zinc-200">Share ⎋</span> →{" "}
               <span className="text-zinc-200">Add to Home Screen</span>. Notifications only work

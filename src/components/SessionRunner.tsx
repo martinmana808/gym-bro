@@ -19,7 +19,8 @@ import {
 import { NumberSelect } from "@/components/NumberSelect";
 import { SetGrid } from "@/components/SetGrid";
 import { useWakeLock } from "@/lib/useWakeLock";
-import { primeAudio, restAlert } from "@/lib/restAlert";
+import { audioArmed, primeAudio, restAlert } from "@/lib/restAlert";
+import { seedForStep } from "@/lib/setSeed";
 import { clearRestOnServer, setSessionPaused, startRestOnServer } from "@/lib/usePush";
 import {
   activeSessionView,
@@ -118,16 +119,17 @@ export function SessionRunner({
   const stepKey = step ? logKey(step.exercise.id, step.setNumber) : null;
   if (step && stepKey !== seededKey) {
     setSeededKey(stepKey);
-    const existing = logs.get(stepKey!);
-    const prev = prevMap.get(stepKey!);
-    const lastWeightThisSession = [...logs.values()]
-      .filter((l) => l.exerciseId === step.exercise.id && l.weight != null)
-      .at(-1)?.weight;
-    setWeight(
-      `${existing?.weight ?? lastWeightThisSession ?? step.exercise.targetWeight ?? prev?.weight ?? ""}`,
-    );
-    setReps(`${existing?.reps ?? prev?.reps ?? step.exercise.repsMin ?? ""}`);
-    setSeconds(`${existing?.timeSeconds ?? prev?.timeSeconds ?? step.exercise.timeSeconds ?? ""}`);
+    const seed = seedForStep({
+      exercise: step.exercise,
+      existing: logs.get(stepKey!),
+      previous: prevMap.get(stepKey!),
+      lastWeightThisSession: [...logs.values()]
+        .filter((l) => l.exerciseId === step.exercise.id && l.weight != null)
+        .at(-1)?.weight,
+    });
+    setWeight(seed.weight);
+    setReps(seed.reps);
+    setSeconds(seed.seconds);
   }
 
   // ---- ticking clock (elapsed + rest countdown)
@@ -156,13 +158,18 @@ export function SessionRunner({
   // The server also holds a copy of this timer so a backgrounded phone still
   // gets buzzed (iOS freezes our JS). If we're still on screen as it runs out,
   // drop the push a moment early — the in-app beep is about to cover it.
+  //
+  // Only when the beep can genuinely sound, though: iOS interrupts the audio
+  // context on screen lock, and cancelling the push on the strength of a beep
+  // that then stays silent is how a rest alarm goes missing entirely.
   const pushDroppedFor = useRef<typeof resting>(null);
   useEffect(() => {
     if (
       resting &&
       restRemaining <= 2 &&
       pushDroppedFor.current !== resting &&
-      document.visibilityState === "visible"
+      document.visibilityState === "visible" &&
+      audioArmed()
     ) {
       pushDroppedFor.current = resting;
       void clearRestOnServer(sessionId);
