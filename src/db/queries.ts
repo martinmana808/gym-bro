@@ -13,6 +13,7 @@ import {
 import { formatStepTarget, type ActiveSessionInput } from "@/lib/activeSession";
 import { deriveWeeks, missingCells, type WeekCol } from "@/lib/weeks";
 import { buildSheetRows, type SheetRow, type SheetWeekMeta } from "@/lib/sheet";
+import { completionOf, percentOf, type Completion, type CompletionExercise } from "@/lib/completion";
 
 export type WorkoutStructure = {
   workout: Workout;
@@ -597,6 +598,56 @@ export async function getActiveSession(userId: string): Promise<ActiveSessionSum
   };
 }
 
+/**
+ * Completion for a set of finished sessions, keyed by session id.
+ *
+ * A session is scored against its own week's exercise list, so every planned
+ * set counts — including the ones never logged, which is what makes skipping
+ * an exercise show up at all.
+ */
+async function completionBySession(
+  sessions: { id: string; variationId: string }[],
+): Promise<Map<string, Completion>> {
+  const out = new Map<string, Completion>();
+  if (!sessions.length) return out;
+  const db = await getDb();
+
+  const variationIds = [...new Set(sessions.map((s) => s.variationId))];
+  const exercises = await db.query.exercises.findMany({
+    where: inArray(schema.exercises.variationId, variationIds),
+  });
+  const logs = await db.query.setLogs.findMany({
+    where: inArray(
+      schema.setLogs.sessionId,
+      sessions.map((s) => s.id),
+    ),
+  });
+
+  const exByVariation = new Map<string, Exercise[]>();
+  for (const e of exercises) {
+    const list = exByVariation.get(e.variationId);
+    if (list) list.push(e);
+    else exByVariation.set(e.variationId, [e]);
+  }
+
+  for (const s of sessions) {
+    const mine = logs.filter((l) => l.sessionId === s.id);
+    const items = (exByVariation.get(s.variationId) ?? []).map((e) => ({
+      exercise: e as CompletionExercise,
+      logs: mine
+        .filter((l) => l.exerciseId === e.id)
+        .map((l) => ({
+          setNumber: l.setNumber,
+          weight: l.weight,
+          reps: l.reps,
+          timeSeconds: l.timeSeconds,
+        })),
+    }));
+    out.set(s.id, completionOf(items));
+  }
+  return out;
+}
+
 export type HistoryEntry = {
   sessionId: string;
   programId: string;
@@ -609,6 +660,11 @@ export type HistoryEntry = {
   setCount: number;
   repCount: number;
   volume: number;
+  /** Work done against work planned, uncapped. Null when nothing was scoreable. */
+  completion: number | null;
+  plannedWork: number;
+  actualWork: number;
+  skippedSets: number;
 };
 
 /** Finished sessions across every workout, newest first — the History tab. */
@@ -644,6 +700,7 @@ export async function listRecentSessions(userId: string, limit = 60): Promise<Hi
   const dayById = new Map(days.map((d) => [d.id, d]));
   const programById = new Map(programs.map((p) => [p.id, p]));
   const variationById = new Map(variations.map((v) => [v.id, v]));
+  const scores = await completionBySession(finished);
 
   return finished.map((s) => {
     const day = dayById.get(s.dayId);
@@ -669,6 +726,10 @@ export async function listRecentSessions(userId: string, limit = 60): Promise<Hi
       setCount: totals.sets,
       repCount: totals.reps,
       volume: totals.volume,
+      completion: scores.get(s.id)?.percent ?? null,
+      plannedWork: scores.get(s.id)?.planned ?? 0,
+      actualWork: scores.get(s.id)?.actual ?? 0,
+      skippedSets: scores.get(s.id)?.skippedSets ?? 0,
     };
   });
 }
@@ -678,6 +739,8 @@ export type HistoryTotals = {
   sets: number;
   reps: number;
   volume: number;
+  /** Every session's work added up, then compared — not an average of averages. */
+  completion: number | null;
 };
 
 /** Everything you've ever finished, for the banner on the History tab. */
@@ -687,7 +750,7 @@ export async function getHistoryTotals(userId: string): Promise<HistoryTotals> {
     where: eq(schema.sessions.userId, userId),
   });
   const finished = sessions.filter((s) => s.finishedAt);
-  if (!finished.length) return { sessions: 0, sets: 0, reps: 0, volume: 0 };
+  if (!finished.length) return { sessions: 0, sets: 0, reps: 0, volume: 0, completion: null };
 
   const logs = await db.query.setLogs.findMany({
     where: inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
@@ -702,5 +765,12 @@ export async function getHistoryTotals(userId: string): Promise<HistoryTotals> {
   const totals = sessionTotals(
     logs.map((l) => ({ ...l, weightUnit: units.get(l.exerciseId) })),
   );
-  return { sessions: finished.length, ...totals };
+  const scores = await completionBySession(finished);
+  let planned = 0;
+  let actual = 0;
+  for (const c of scores.values()) {
+    planned += c.planned;
+    actual += c.actual;
+  }
+  return { sessions: finished.length, ...totals, completion: percentOf(planned, actual) };
 }

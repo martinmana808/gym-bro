@@ -2,6 +2,7 @@ import Link from "next/link";
 import { requireUserId } from "@/auth";
 import { getHistoryTotals, listRecentSessions } from "@/db/queries";
 import { formatClock } from "@/lib/workout";
+import { CompletionTrend } from "@/components/CompletionTrend";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +29,32 @@ export default async function HistoryPage() {
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-5 px-4 pt-6">
       <h1 className="page-title">History</h1>
+
+      {totals.completion != null && (
+        <section className="card p-5">
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="section-label">all-time completion</p>
+            <p
+              className={`display-num shrink-0 text-4xl font-bold leading-none ${
+                totals.completion > 100 ? "text-lime-400" : "text-zinc-100"
+              }`}
+            >
+              {totals.completion}%
+            </p>
+          </div>
+          <p className="mt-2.5 text-sm text-zinc-400">
+            of everything the plan has ever asked for
+          </p>
+        </section>
+      )}
+
+      <CompletionTrend
+        points={sessions
+          .filter((s) => s.completion != null)
+          .slice(0, 12)
+          .reverse()
+          .map((s) => ({ date: s.startedAt, percent: s.completion! }))}
+      />
 
       {totals.sessions > 0 && (
         <section className="grid grid-cols-2 gap-3 text-center">
@@ -62,8 +89,19 @@ export default async function HistoryPage() {
             >
               <div className="flex items-baseline justify-between gap-3">
                 <h3 className="truncate font-semibold tracking-tight">{s.dayName}</h3>
-                <span className="display-num shrink-0 text-sm text-zinc-400">
-                  {formatClock(s.durationSeconds)}
+                <span className="flex shrink-0 items-baseline gap-2.5">
+                  {s.completion != null && (
+                    <span
+                      className={`display-num text-sm font-semibold ${
+                        s.completion > 100 ? "text-lime-400" : "text-zinc-200"
+                      }`}
+                    >
+                      {s.completion}%
+                    </span>
+                  )}
+                  <span className="display-num text-sm text-zinc-400">
+                    {formatClock(s.durationSeconds)}
+                  </span>
                 </span>
               </div>
               <p className="mt-0.5 truncate text-sm text-zinc-400">

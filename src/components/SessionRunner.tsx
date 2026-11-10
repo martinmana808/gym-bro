@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { deleteSession, finishSession, logSet, saveSessionNote } from "@/app/actions";
@@ -28,7 +29,7 @@ import {
   hitsTarget,
   sessionElapsedSeconds,
 } from "@/lib/activeSession";
-import { CHROME_SPACE, NAV_HEIGHT } from "@/components/AppChrome";
+import { CHROME_SPACE, SESSION_WIDGET_SLOT } from "@/components/AppChrome";
 import { PauseButton, SessionWidget, SetsButton } from "@/components/SessionWidget";
 
 export type LogEntry = SetEntry;
@@ -89,6 +90,12 @@ export function SessionRunner({
     );
     return i === -1 ? Math.max(0, setSteps.length - 1) : i;
   });
+
+  // Exercises bailed on for this session. Their sets stay in the plan — so
+  // they still count against completion — but the runner stops offering them.
+  // In a superset the two exercises interleave, so skipping one has to step
+  // over its sets while leaving its partner's alone.
+  const [skipped, setSkipped] = useState<ReadonlySet<string>>(() => new Set());
   // Seeded from the server so reloading (or coming back from another page)
   // doesn't lose a running rest.
   const [resting, setResting] = useState<{ endsAt: number; total: number } | null>(() =>
@@ -110,6 +117,14 @@ export function SessionRunner({
   const [restHidden, setRestHidden] = useState(false);
 
   const step = setSteps[setIndex];
+
+  /** The next set still on the table, or -1 when everything after is skipped. */
+  const nextLiveIndex = (from: number, dropped: ReadonlySet<string> = skipped) => {
+    for (let i = from + 1; i < setSteps.length; i++) {
+      if (!dropped.has(setSteps[i].exercise.id)) return i;
+    }
+    return -1;
+  };
 
   // ---- form state, re-seeded during render whenever the current step changes
   const [weight, setWeight] = useState("");
@@ -141,7 +156,10 @@ export function SessionRunner({
   }, []);
   const restRemaining = resting ? Math.ceil((resting.endsAt - now) / 1000) : 0;
   const isResting = resting !== null && restRemaining > 0;
-  const done = logs.size >= setSteps.length && !isResting;
+  const done =
+    setSteps
+      .filter((s) => !skipped.has(s.exercise.id))
+      .every((s) => logs.has(logKey(s.exercise.id, s.setNumber))) && !isResting;
 
   // Fire the alert exactly once when the countdown crosses zero.
   const restAlertedFor = useRef<typeof resting>(null);
@@ -190,6 +208,21 @@ export function SessionRunner({
     void clearRestOnServer(sessionId);
   };
 
+  /** Not doing this set — move on and leave it unlogged. */
+  const skipSet = () => {
+    const i = nextLiveIndex(setIndex);
+    if (i !== -1) setSetIndex(i);
+  };
+
+  /** Not doing this exercise at all today — drop its remaining sets. */
+  const skipExercise = () => {
+    if (!step) return;
+    const dropped = new Set(skipped).add(step.exercise.id);
+    setSkipped(dropped);
+    const i = nextLiveIndex(setIndex, dropped);
+    if (i !== -1) setSetIndex(i);
+  };
+
   const submitSet = async (over?: { reps?: number; ok?: boolean }) => {
     primeAudio();
     if (!step) return;
@@ -221,11 +254,12 @@ export function SessionRunner({
     // Rest if the step right after this one (in the full step list) is a rest.
     const flatIndex = steps.indexOf(step);
     const next = steps[flatIndex + 1];
+    const upcoming = nextLiveIndex(setIndex);
     if (next?.kind === "rest") {
       setJustDid(`${step.exercise.name} · ${formatLoggedSet(entry, step.exercise.weightUnit)}`);
-      startRest(next.seconds, setSteps[setIndex + 1]?.exercise.name ?? null);
+      startRest(next.seconds, upcoming === -1 ? null : setSteps[upcoming].exercise.name);
     }
-    if (setIndex < setSteps.length - 1) setSetIndex(setIndex + 1);
+    if (upcoming !== -1) setSetIndex(upcoming);
   };
 
   const finish = async () => {
@@ -338,6 +372,19 @@ export function SessionRunner({
             <span className="display-num">{elapsed}</span>
             {paused && <span className="text-zinc-400"> · paused</span>} · {logs.size}/
             {setSteps.length} sets
+            {skipped.size > 0 && (
+              <>
+                {" · "}
+                {/* Up here rather than beside the skip buttons, which sit
+                    under the widget — you'd never see it. */}
+                <button
+                  onClick={() => setSkipped(new Set())}
+                  className="underline decoration-dotted underline-offset-2 transition hover:text-zinc-200"
+                >
+                  {skipped.size} skipped · undo
+                </button>
+              </>
+            )}
           </p>
           <button
             onClick={finish}
@@ -521,20 +568,33 @@ export function SessionRunner({
             {saving ? "Saving…" : alreadyLogged ? "Update set" : "Log set"}
           </button>
 
-          <div className="flex justify-between text-sm text-zinc-400">
+          {/* Skipping is a decision, not a navigation accident — so it gets
+              real buttons. An unlogged set counts as zero against the
+              session's completion, which is the point. */}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={skipSet}
+              disabled={saving || nextLiveIndex(setIndex) === -1}
+              className="btn btn-ghost py-2.5 text-sm"
+            >
+              Skip set
+            </button>
+            <button
+              onClick={skipExercise}
+              disabled={saving}
+              className="btn btn-ghost py-2.5 text-sm"
+            >
+              Skip exercise
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 text-sm text-zinc-400">
             <button
               onClick={() => setSetIndex((i) => Math.max(0, i - 1))}
               disabled={setIndex === 0}
               className="rounded-lg px-2 py-1 transition hover:text-zinc-300 disabled:opacity-30"
             >
               ← Previous set
-            </button>
-            <button
-              onClick={() => setSetIndex((i) => Math.min(setSteps.length - 1, i + 1))}
-              disabled={setIndex >= setSteps.length - 1}
-              className="rounded-lg px-2 py-1 transition hover:text-zinc-300 disabled:opacity-30"
-            >
-              Skip set →
             </button>
           </div>
 
@@ -588,11 +648,10 @@ export function SessionRunner({
       </div>
 
       {/* The same widget every other page shows, so nothing jumps when you
-          move in and out of the session — only the controls differ. */}
-      <div
-        className="fixed inset-x-0 z-40"
-        style={{ bottom: `calc(${NAV_HEIGHT} + env(safe-area-inset-bottom))` }}
-      >
+          move in and out of the session — only the controls differ. It goes
+          into the chrome's own slot so it stacks on the tab bar instead of
+          floating above it and risking an overlap. */}
+      <ChromeWidgetSlot>
         <SessionWidget
           view={widgetView}
           trailing={
@@ -602,9 +661,19 @@ export function SessionRunner({
             </span>
           }
         />
-      </div>
+      </ChromeWidgetSlot>
     </>
   );
+}
+
+/** Renders into the bottom chrome, once it exists in the DOM. */
+function ChromeWidgetSlot({ children }: { children: React.ReactNode }) {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  // The slot is a DOM node owned by the layout, so it only exists once that
+  // has committed — there is nothing to read at render time.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
+  useEffect(() => setSlot(document.getElementById(SESSION_WIDGET_SLOT)), []);
+  return slot ? createPortal(children, slot) : null;
 }
 
 function TodayNote({

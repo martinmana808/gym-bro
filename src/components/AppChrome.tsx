@@ -20,6 +20,16 @@ export const WIDGET_HEIGHT = "5.75rem";
 export const CHROME_SPACE = `calc(${NAV_HEIGHT} + ${WIDGET_HEIGHT} + env(safe-area-inset-bottom) + 1rem)`;
 
 /**
+ * Where the session page hangs its own live widget. It portals into here
+ * rather than positioning a second fixed element above the tab bar: two fixed
+ * boxes each doing their own `bottom: NAV_HEIGHT + inset` arithmetic only stay
+ * flush while every constant agrees with the nav's real height, and the moment
+ * one drifts the widget slides underneath. As a sibling in this container it
+ * is simply stacked above the bar, and cannot overlap it at all.
+ */
+export const SESSION_WIDGET_SLOT = "session-widget-slot";
+
+/**
  * The app's bottom chrome: the tab bar, with the session widget riding on top
  * of it like a music app's mini player. Fixed and full width — it belongs to
  * the device, not to any one page.
@@ -92,6 +102,9 @@ export function AppChrome() {
             />
           </Link>
         )}
+        {/* Filled by the session page's own widget, which has live state the
+            polled copy above can't know about (rest countdown, pause). */}
+        <div id={SESSION_WIDGET_SLOT} />
         <NavBar
           hasSession={Boolean(active)}
           sessionId={active?.sessionId ?? null}

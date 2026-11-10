@@ -7,6 +7,7 @@ import { SessionRunner, type LogEntry } from "@/components/SessionRunner";
 import { ConfirmSubmit } from "@/components/ConfirmSubmit";
 import { FinishedSets } from "@/components/FinishedSets";
 import { formatClock, sessionTotals } from "@/lib/workout";
+import { completionOf, type Completion, type CompletionExercise } from "@/lib/completion";
 
 export const dynamic = "force-dynamic";
 
@@ -51,8 +52,22 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   // Finished: summary view. Time spent paused doesn't count as workout time.
   const durationSeconds =
     (session.finishedAt.getTime() - session.startedAt.getTime() - session.pausedMs) / 1000;
-  const unitOf = new Map(structure.blocks.flatMap((b) => b.exercises).map((e) => [e.id, e.weightUnit]));
+  const allExercises = structure.blocks.flatMap((b) => b.exercises);
+  const unitOf = new Map(allExercises.map((e) => [e.id, e.weightUnit]));
   const totals = sessionTotals(logs.map((l) => ({ ...l, weightUnit: unitOf.get(l.exerciseId) })));
+  const completion = completionOf(
+    allExercises.map((e) => ({
+      exercise: e as CompletionExercise,
+      logs: logs
+        .filter((l) => l.exerciseId === e.id)
+        .map((l) => ({
+          setNumber: l.setNumber,
+          weight: l.weight,
+          reps: l.reps,
+          timeSeconds: l.timeSeconds,
+        })),
+    })),
+  );
 
   return (
     <main className="mx-auto flex w-full max-w-md flex-1 flex-col gap-6 px-4 pb-10 pt-6">
@@ -75,6 +90,10 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           </p>
         </div>
       </header>
+
+      {completion.percent != null && (
+        <CompletionCard completion={completion} />
+      )}
 
       <div className="grid grid-cols-2 gap-3 text-center">
         <Tile label="duration" value={durationSeconds > 0 ? formatClock(durationSeconds) : "—"} />
@@ -102,6 +121,55 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
         </ConfirmSubmit>
       </form>
     </main>
+  );
+}
+
+/**
+ * Expectation versus reality for the session: the work the plan asked for
+ * against the work actually done. Over 100% is not a rounding error — it means
+ * the targets have been outgrown, so it says so in words.
+ */
+function CompletionCard({ completion }: { completion: Completion }) {
+  const pct = completion.percent!;
+  const above = pct > 100;
+  const note = above
+    ? "Above plan — time to raise your targets."
+    : pct === 100
+      ? "Exactly to plan."
+      : completion.skippedSets > 0
+        ? `${completion.skippedSets} set${completion.skippedSets === 1 ? "" : "s"} not done.`
+        : "Short on weight or reps.";
+
+  return (
+    <section className="card p-5">
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="section-label">completion</p>
+        <p
+          className={`display-num text-4xl font-bold leading-none ${
+            above ? "text-lime-400" : "text-zinc-100"
+          }`}
+        >
+          {pct}%
+        </p>
+      </div>
+      {/* The bar fills to 100 and the overshoot rides past it in a lighter
+          tone, so beating the plan still reads as a full bar plus extra. */}
+      <div className="well mt-3 h-2 w-full overflow-hidden p-0">
+        <div className="flex h-full w-full">
+          <div
+            className="h-full bg-lime-400"
+            style={{ width: `${Math.min(100, pct)}%` }}
+          />
+          {above && (
+            <div
+              className="h-full bg-lime-400/40"
+              style={{ width: `${Math.min(100, pct - 100)}%` }}
+            />
+          )}
+        </div>
+      </div>
+      <p className="mt-2.5 text-sm text-zinc-400">{note}</p>
+    </section>
   );
 }
 

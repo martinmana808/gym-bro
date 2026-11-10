@@ -5,6 +5,17 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* SHARP's green. The utilities across the app are spelled `lime-400` and
+   friends, so the brand lives here, in the palette itself — one place to
+   change it rather than sixty-odd class names. 300 is the hover step up,
+   500/600 the steps down. */
+@theme {
+  --color-lime-300: #f1ff8a;
+  --color-lime-400: #e8fe53;
+  --color-lime-500: #cfe63a;
+  --color-lime-600: #a9bf26;
+}
+
 /* The app is dark-only: keep native form controls, scrollbars and
    autofill consistent regardless of the device's color scheme. */
 :root {
@@ -21,7 +32,7 @@
   --line: rgb(255 255 255 / 0.07);
   --line-strong: rgb(255 255 255 / 0.13);
 
-  --accent: #a3e635;
+  --accent: #e8fe53;
   --accent-ink: #0a0a0a;
 }
 
