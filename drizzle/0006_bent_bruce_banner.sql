@@ -1,0 +1,1 @@
+ALTER TABLE "set_logs" ADD COLUMN "skipped" boolean DEFAULT false NOT NULL;

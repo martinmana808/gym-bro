@@ -33,6 +33,7 @@ const base: ActiveSessionInput = {
     step("a", "Press plano", 2),
   ],
   loggedKeys: [],
+  skippedKeys: [],
 };
 
 const NOW = 1_000_000;
@@ -114,6 +115,34 @@ describe("activeSessionView — done", () => {
     );
     expect(v.mode).toBe("resting");
     expect(v.subtitle).toBe("Tap to finish");
+  });
+});
+
+describe("activeSessionView — skipped sets", () => {
+  // Straight from a real session: the first exercise of a superset was
+  // skipped, and the widget went on announcing it as "next up" for the rest
+  // of the workout while four other exercises were worked through.
+  it("does not point at a set that was skipped", () => {
+    const v = activeSessionView({ ...base, skippedKeys: ["a#1", "a#2"] }, NOW);
+    expect(v.title).toBe("Flexiones de brazos");
+  });
+
+  it("counts the session done once the rest are logged", () => {
+    const v = activeSessionView({ ...base, skippedKeys: ["a#1", "a#2"], loggedKeys: ["b#1"] }, NOW);
+    expect(v.mode).toBe("done");
+    expect(v.title).toBe("Session done");
+    expect(v.subtitle).toBe("Tap to finish");
+  });
+
+  it("counts a skip as settled in the progress bar", () => {
+    const v = activeSessionView({ ...base, skippedKeys: ["a#1"], loggedKeys: ["b#1"] }, NOW);
+    expect(v.progress).toBeCloseTo(2 / 3);
+  });
+
+  it("still offers a skipped set's partner in the same round", () => {
+    const v = activeSessionView({ ...base, skippedKeys: ["a#1"] }, NOW);
+    expect(v.title).toBe("Flexiones de brazos");
+    expect(v.position).toBe("Round 1/3");
   });
 });
 

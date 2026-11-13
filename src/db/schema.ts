@@ -111,6 +111,12 @@ export const setLogs = pgTable(
     reps: integer("reps"),
     timeSeconds: integer("time_seconds"),
     hitTarget: boolean("hit_target").notNull().default(false),
+    // A deliberate "not doing this one today". The row exists so the app can
+    // tell "decided against it" from "haven't got there yet" — without it a
+    // skip is invisible to everything that reads progress out of this table,
+    // and the session walks you back to the exercise you just refused.
+    // Values stay null: a skipped set is zero work, and counts as such.
+    skipped: boolean("skipped").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex("set_logs_unique_set").on(t.sessionId, t.exerciseId, t.setNumber)],

@@ -16,7 +16,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   const userId = await requireUserId();
   const data = await getSessionData(id, userId);
   if (!data) notFound();
-  const { session, structure, logs, previousLogs, notes } = data;
+  const { session, structure, logs, skippedKeys, previousLogs, notes } = data;
 
   const toEntry = (l: (typeof logs)[number]): LogEntry => ({
     exerciseId: l.exerciseId,
@@ -43,6 +43,7 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
           exercises: b.exercises,
         }))}
         initialLogs={logs.map(toEntry)}
+        initialSkippedKeys={skippedKeys}
         previousLogs={previousLogs.map(toEntry)}
         initialNotes={notes.map((n) => ({ exerciseId: n.exerciseId, note: n.note }))}
       />

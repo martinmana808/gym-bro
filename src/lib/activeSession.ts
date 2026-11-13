@@ -25,6 +25,8 @@ export type ActiveSessionInput = {
   steps: ActiveStep[];
   /** "exerciseId#setNumber" for each set already logged. */
   loggedKeys: string[];
+  /** The same, for sets deliberately skipped. Settled, so never "next up". */
+  skippedKeys: string[];
 };
 
 export type ActiveSessionView = {
@@ -98,12 +100,32 @@ function mmss(totalSeconds: number): string {
   return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
+/**
+ * The next set still on the table: the first that is neither logged nor
+ * skipped. A skip has to count as settled here — otherwise the widget points
+ * at the exercise you turned down for the rest of the session, and the
+ * workout can never read as finished.
+ */
+export function nextPendingStep<T extends { exerciseId: string; setNumber: number }>(
+  steps: T[],
+  logged: ReadonlySet<string>,
+  skipped: ReadonlySet<string>,
+  from = 0,
+): T | undefined {
+  return steps
+    .slice(from)
+    .find((s) => !logged.has(`${s.exerciseId}#${s.setNumber}`) && !skipped.has(`${s.exerciseId}#${s.setNumber}`));
+}
+
 export function activeSessionView(input: ActiveSessionInput, nowMs: number): ActiveSessionView {
   const logged = new Set(input.loggedKeys);
-  const next = input.steps.find((s) => !logged.has(`${s.exerciseId}#${s.setNumber}`));
+  const skipped = new Set(input.skippedKeys);
+  const next = nextPendingStep(input.steps, logged, skipped);
 
   const base = {
-    progress: input.steps.length ? logged.size / input.steps.length : 1,
+    // Settled, not done: a skipped set is dealt with, so the bar reflects how
+    // far through the workout you are rather than how much you lifted.
+    progress: input.steps.length ? (logged.size + skipped.size) / input.steps.length : 1,
     elapsedSeconds: sessionElapsedSeconds(input, nowMs),
   };
 
@@ -139,7 +161,7 @@ export function activeSessionView(input: ActiveSessionInput, nowMs: number): Act
     return {
       ...base,
       mode: "done",
-      title: "All sets logged",
+      title: skipped.size > 0 ? "Session done" : "All sets logged",
       timer: null,
       subtitle: "Tap to finish",
       position: "",

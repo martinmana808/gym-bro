@@ -4,7 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { deleteSession, finishSession, logSet, saveSessionNote } from "@/app/actions";
+import {
+  deleteSession,
+  finishSession,
+  logSet,
+  saveSessionNote,
+  skipSets,
+  unskipSets,
+} from "@/app/actions";
 import {
   blockLabel,
   buildSteps,
@@ -49,6 +56,7 @@ export function SessionRunner({
   defaultRestSeconds,
   blocks,
   initialLogs,
+  initialSkippedKeys,
   previousLogs,
   initialNotes,
 }: {
@@ -62,6 +70,8 @@ export function SessionRunner({
   defaultRestSeconds: number;
   blocks: RunnerBlock[];
   initialLogs: LogEntry[];
+  /** Sets already marked "not doing this today", as exerciseId#setNumber. */
+  initialSkippedKeys: string[];
   previousLogs: LogEntry[];
   initialNotes: { exerciseId: string; note: string }[];
 }) {
@@ -83,19 +93,27 @@ export function SessionRunner({
     [previousLogs],
   );
 
-  // Resume at the first set that hasn't been logged yet.
+  // Resume at the first set that is neither logged nor skipped.
   const [setIndex, setSetIndex] = useState(() => {
-    const i = setSteps.findIndex(
-      (s) => !initialLogs.some((l) => l.exerciseId === s.exercise.id && l.setNumber === s.setNumber),
-    );
+    const settled = new Set([
+      ...initialLogs.map((l) => logKey(l.exerciseId, l.setNumber)),
+      ...initialSkippedKeys,
+    ]);
+    const i = setSteps.findIndex((s) => !settled.has(logKey(s.exercise.id, s.setNumber)));
     return i === -1 ? Math.max(0, setSteps.length - 1) : i;
   });
 
-  // Exercises bailed on for this session. Their sets stay in the plan — so
-  // they still count against completion — but the runner stops offering them.
-  // In a superset the two exercises interleave, so skipping one has to step
-  // over its sets while leaving its partner's alone.
-  const [skipped, setSkipped] = useState<ReadonlySet<string>>(() => new Set());
+  // Sets bailed on for this session, keyed exerciseId#setNumber. They stay in
+  // the plan — so they still count against completion — but the runner stops
+  // offering them. In a superset the two exercises interleave, so skipping one
+  // has to step over its sets while leaving its partner's alone.
+  //
+  // Seeded from the server and written back on every change: held only in the
+  // page, a skip is invisible to the widget and to where a reload resumes,
+  // and the session walks you back to the exercise you turned down.
+  const [skipped, setSkipped] = useState<ReadonlySet<string>>(
+    () => new Set(initialSkippedKeys),
+  );
   // Seeded from the server so reloading (or coming back from another page)
   // doesn't lose a running rest.
   const [resting, setResting] = useState<{ endsAt: number; total: number } | null>(() =>
@@ -121,7 +139,7 @@ export function SessionRunner({
   /** The next set still on the table, or -1 when everything after is skipped. */
   const nextLiveIndex = (from: number, dropped: ReadonlySet<string> = skipped) => {
     for (let i = from + 1; i < setSteps.length; i++) {
-      if (!dropped.has(setSteps[i].exercise.id)) return i;
+      if (!dropped.has(logKey(setSteps[i].exercise.id, setSteps[i].setNumber))) return i;
     }
     return -1;
   };
@@ -156,10 +174,28 @@ export function SessionRunner({
   }, []);
   const restRemaining = resting ? Math.ceil((resting.endsAt - now) / 1000) : 0;
   const isResting = resting !== null && restRemaining > 0;
-  const done =
-    setSteps
-      .filter((s) => !skipped.has(s.exercise.id))
-      .every((s) => logs.has(logKey(s.exercise.id, s.setNumber))) && !isResting;
+  /** Sets still waiting on a decision — neither logged nor skipped. */
+  const pending = setSteps.filter(
+    (s) =>
+      !logs.has(logKey(s.exercise.id, s.setNumber)) &&
+      !skipped.has(logKey(s.exercise.id, s.setNumber)),
+  );
+  const done = pending.length === 0 && !isResting;
+
+  /** Exercises dropped outright today: every set skipped, none logged. */
+  const droppedExerciseIds = (() => {
+    const tally = new Map<string, { skipped: number; logged: number; total: number }>();
+    for (const s of setSteps) {
+      const t = tally.get(s.exercise.id) ?? { skipped: 0, logged: 0, total: 0 };
+      t.total++;
+      if (logs.has(logKey(s.exercise.id, s.setNumber))) t.logged++;
+      else if (skipped.has(logKey(s.exercise.id, s.setNumber))) t.skipped++;
+      tally.set(s.exercise.id, t);
+    }
+    const out = new Set<string>();
+    for (const [id, t] of tally) if (t.logged === 0 && t.skipped === t.total) out.add(id);
+    return out;
+  })();
 
   // Fire the alert exactly once when the countdown crosses zero.
   const restAlertedFor = useRef<typeof resting>(null);
@@ -208,19 +244,49 @@ export function SessionRunner({
     void clearRestOnServer(sessionId);
   };
 
+  /** Record skips locally and on the server, then move to the next live set. */
+  const applySkip = (sets: { exerciseId: string; setNumber: number }[]) => {
+    if (!sets.length) return;
+    const dropped = new Set(skipped);
+    for (const s of sets) dropped.add(logKey(s.exerciseId, s.setNumber));
+    setSkipped(dropped);
+    void skipSets({ sessionId, sets }).catch(() =>
+      setError("Could not save the skip — it may come back if you reload."),
+    );
+    const i = nextLiveIndex(setIndex, dropped);
+    if (i !== -1) setSetIndex(i);
+  };
+
   /** Not doing this set — move on and leave it unlogged. */
   const skipSet = () => {
-    const i = nextLiveIndex(setIndex);
-    if (i !== -1) setSetIndex(i);
+    if (!step) return;
+    // Already logged? There's nothing to skip; just move along.
+    if (logs.has(logKey(step.exercise.id, step.setNumber))) {
+      const i = nextLiveIndex(setIndex);
+      if (i !== -1) setSetIndex(i);
+      return;
+    }
+    applySkip([{ exerciseId: step.exercise.id, setNumber: step.setNumber }]);
   };
 
   /** Not doing this exercise at all today — drop its remaining sets. */
   const skipExercise = () => {
     if (!step) return;
-    const dropped = new Set(skipped).add(step.exercise.id);
-    setSkipped(dropped);
-    const i = nextLiveIndex(setIndex, dropped);
-    if (i !== -1) setSetIndex(i);
+    // Only the sets still outstanding: skipping out of an exercise means "no
+    // more of this today", not "bin the sets I already did".
+    applySkip(
+      setSteps
+        .filter(
+          (s) =>
+            s.exercise.id === step.exercise.id && !logs.has(logKey(s.exercise.id, s.setNumber)),
+        )
+        .map((s) => ({ exerciseId: s.exercise.id, setNumber: s.setNumber })),
+    );
+  };
+
+  const undoSkips = () => {
+    setSkipped(new Set());
+    void unskipSets({ sessionId }).catch(() => setError("Could not undo the skips — try again."));
   };
 
   const submitSet = async (over?: { reps?: number; ok?: boolean }) => {
@@ -250,6 +316,12 @@ export function SessionRunner({
     }
     setSaving(false);
     setLogs((m) => new Map(m).set(logKey(entry.exerciseId, entry.setNumber), entry));
+    const key = logKey(entry.exerciseId, entry.setNumber);
+    if (skipped.has(key)) {
+      const back = new Set(skipped);
+      back.delete(key);
+      setSkipped(back);
+    }
 
     // Rest if the step right after this one (in the full step list) is a rest.
     const flatIndex = steps.indexOf(step);
@@ -263,7 +335,15 @@ export function SessionRunner({
   };
 
   const finish = async () => {
-    if (!done && !confirm("Some sets are not logged yet. Finish anyway?")) return;
+    // Skipped sets are a decision already made, so they don't count as
+    // unfinished business — only sets you haven't got to yet do.
+    if (
+      pending.length > 0 &&
+      !confirm(
+        `${pending.length} set${pending.length === 1 ? "" : "s"} still to go. Finish the workout anyway?`,
+      )
+    )
+      return;
     setFinishing(true);
     void clearRestOnServer(sessionId);
     try {
@@ -308,6 +388,7 @@ export function SessionRunner({
         targetLabel: formatStepTarget(s.exercise),
       })),
       loggedKeys: [...logs.keys()],
+      skippedKeys: [...skipped],
     },
     now,
   );
@@ -378,7 +459,7 @@ export function SessionRunner({
                 {/* Up here rather than beside the skip buttons, which sit
                     under the widget — you'd never see it. */}
                 <button
-                  onClick={() => setSkipped(new Set())}
+                  onClick={undoSkips}
                   className="underline decoration-dotted underline-offset-2 transition hover:text-zinc-200"
                 >
                   {skipped.size} skipped · undo
@@ -391,7 +472,7 @@ export function SessionRunner({
             disabled={finishing || discarding}
             className="btn btn-ghost shrink-0 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider hover:!border-red-500/60 hover:!text-red-400"
           >
-            {finishing ? "Ending…" : "End session"}
+            {finishing ? "Finishing…" : "Finish"}
           </button>
         </div>
       {isResting && resting && !restHidden ? (
@@ -412,15 +493,28 @@ export function SessionRunner({
           nextUp={step ? step.exercise.name : null}
           nextTarget={step ? formatStepTarget(step.exercise) : null}
           rundown={
-            step ? <BlockRundown block={usedBlocks[step.blockIndex]} currentId={step.exercise.id} /> : null
+            step ? (
+              <BlockRundown
+                block={usedBlocks[step.blockIndex]}
+                currentId={step.exercise.id}
+                skippedIds={droppedExerciseIds}
+              />
+            ) : null
           }
           justDid={justDid}
         />
       ) : done ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
           <p className="text-5xl">🏁</p>
-          <h2 className="text-3xl font-bold tracking-tight">All sets logged!</h2>
+          <h2 className="text-3xl font-bold tracking-tight">
+            {skipped.size > 0 ? "Nothing left to do" : "All sets logged!"}
+          </h2>
           <p className="text-zinc-400">
+            {skipped.size > 0 && (
+              <>
+                {skipped.size} set{skipped.size === 1 ? "" : "s"} skipped.{" "}
+              </>
+            )}
             Hit <span className="font-medium text-lime-400">Finish</span> to stamp your workout
             time.
           </p>
@@ -467,7 +561,11 @@ export function SessionRunner({
                 </span>
               )}
             </div>
-            <BlockRundown block={usedBlocks[step.blockIndex]} currentId={step.exercise.id} />
+            <BlockRundown
+              block={usedBlocks[step.blockIndex]}
+              currentId={step.exercise.id}
+              skippedIds={droppedExerciseIds}
+            />
 
             <TodayNote
               key={step.exercise.id}
@@ -574,7 +672,7 @@ export function SessionRunner({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={skipSet}
-              disabled={saving || nextLiveIndex(setIndex) === -1}
+              disabled={saving}
               className="btn btn-ghost py-2.5 text-sm"
             >
               Skip set
@@ -630,6 +728,7 @@ export function SessionRunner({
             <SetGrid
               blocks={blocks}
               entries={[...logs.values()]}
+              skippedKeys={skipped}
               activeKey={stepKey}
               onCellTap={(exerciseId, setNumber) => {
                 const i = setSteps.findIndex(
@@ -795,9 +894,12 @@ function RestScreen({
 function BlockRundown({
   block,
   currentId,
+  skippedIds,
 }: {
   block: RunnerBlock | undefined;
   currentId: string;
+  /** Partners dropped for today — struck through rather than silently listed. */
+  skippedIds?: ReadonlySet<string>;
 }) {
   if (!block || block.exercises.length < 2) return null;
   return (
@@ -808,19 +910,25 @@ function BlockRundown({
       <ul className="mt-1.5 flex flex-col gap-1">
         {block.exercises.map((e, i) => {
           const isCurrent = e.id === currentId;
+          const isSkipped = skippedIds?.has(e.id) ?? false;
           return (
             <li
               key={e.id}
               className={`flex items-baseline justify-between gap-3 text-sm ${
-                isCurrent ? "font-semibold text-zinc-100" : "text-zinc-400"
+                isSkipped
+                  ? "text-zinc-600 line-through"
+                  : isCurrent
+                    ? "font-semibold text-zinc-100"
+                    : "text-zinc-400"
               }`}
             >
               <span className="truncate">
                 {i + 1}. {e.name}
               </span>
               <span className="shrink-0 metric">
-                {e.targetWeight != null ? `${formatTargetWeight(e)} · ` : ""}
-                {formatReps(e)}
+                {isSkipped
+                  ? "skipped"
+                  : `${e.targetWeight != null ? `${formatTargetWeight(e)} · ` : ""}${formatReps(e)}`}
               </span>
             </li>
           );

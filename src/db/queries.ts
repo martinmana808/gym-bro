@@ -15,6 +15,14 @@ import { deriveWeeks, missingCells, type WeekCol } from "@/lib/weeks";
 import { buildSheetRows, type SheetRow, type SheetWeekMeta } from "@/lib/sheet";
 import { completionOf, percentOf, type Completion, type CompletionExercise } from "@/lib/completion";
 
+/**
+ * A skipped set lives in the same table as a logged one, flagged. Every
+ * "what did I actually do" read wants the logged ones only — volume, reps,
+ * completion and history all treat a skip as zero, which is the point of it.
+ * The two places that care about the distinction ask for it explicitly.
+ */
+const realLogsOnly = eq(schema.setLogs.skipped, false);
+
 export type WorkoutStructure = {
   workout: Workout;
   blocks: (Block & { exercises: Exercise[] })[];
@@ -194,7 +202,10 @@ export async function getWorkoutHistory(
   const finished = sessions.filter((s) => s.finishedAt).slice(0, limit);
   const logs = finished.length
     ? await db.query.setLogs.findMany({
-        where: inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
+        where: and(
+          inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
+          realLogsOnly,
+        ),
         orderBy: asc(schema.setLogs.setNumber),
       })
     : [];
@@ -235,6 +246,8 @@ export type SessionData = {
   session: Session;
   structure: WorkoutStructure;
   logs: SetLog[];
+  /** "exerciseId#setNumber" for each set deliberately skipped this session. */
+  skippedKeys: string[];
   previousLogs: SetLog[];
   notes: SessionNote[];
 };
@@ -250,9 +263,11 @@ export async function getSessionData(
   if (!session) return null;
   const structure = await getVariationStructure(session.variationId, userId);
   if (!structure) return null;
-  const logs = await db.query.setLogs.findMany({
+  const rows = await db.query.setLogs.findMany({
     where: eq(schema.setLogs.sessionId, sessionId),
   });
+  const logs = rows.filter((l) => !l.skipped);
+  const skippedKeys = rows.filter((l) => l.skipped).map((l) => `${l.exerciseId}#${l.setNumber}`);
   const previous = await db.query.sessions.findMany({
     where: and(
       eq(schema.sessions.dayId, session.dayId),
@@ -262,13 +277,17 @@ export async function getSessionData(
     orderBy: desc(schema.sessions.startedAt),
   });
   const prev = previous.find((s) => s.finishedAt && s.startedAt < session.startedAt);
+  // Last time's numbers seed this time's fields, so a skip must not seed
+  // anything — it has no numbers in it.
   const previousLogs = prev
-    ? await db.query.setLogs.findMany({ where: eq(schema.setLogs.sessionId, prev.id) })
+    ? await db.query.setLogs.findMany({
+        where: and(eq(schema.setLogs.sessionId, prev.id), realLogsOnly),
+      })
     : [];
   const notes = await db.query.sessionNotes.findMany({
     where: eq(schema.sessionNotes.sessionId, sessionId),
   });
-  return { session, structure, logs, previousLogs, notes };
+  return { session, structure, logs, skippedKeys, previousLogs, notes };
 }
 
 /** Insert-only: pad any missing (day, position) cell in a program with an empty
@@ -495,9 +514,12 @@ export async function getProgramSheet(
   const finished = sessions.filter((s) => s.finishedAt);
   const logs = finished.length
     ? await db.query.setLogs.findMany({
-        where: inArray(
-          schema.setLogs.sessionId,
-          finished.map((s) => s.id),
+        where: and(
+          inArray(
+            schema.setLogs.sessionId,
+            finished.map((s) => s.id),
+          ),
+          realLogsOnly,
         ),
         orderBy: asc(schema.setLogs.setNumber),
       })
@@ -567,7 +589,7 @@ export async function getActiveSession(userId: string): Promise<ActiveSessionSum
   const structure = await getVariationStructure(session.variationId, userId);
   if (!structure) return null;
 
-  const logs = await db.query.setLogs.findMany({
+  const rows = await db.query.setLogs.findMany({
     where: eq(schema.setLogs.sessionId, session.id),
   });
 
@@ -594,7 +616,8 @@ export async function getActiveSession(userId: string): Promise<ActiveSessionSum
     pausedAtMs: session.pausedAt ? session.pausedAt.getTime() : null,
     pausedMs: session.pausedMs,
     steps,
-    loggedKeys: logs.map((l) => `${l.exerciseId}#${l.setNumber}`),
+    loggedKeys: rows.filter((l) => !l.skipped).map((l) => `${l.exerciseId}#${l.setNumber}`),
+    skippedKeys: rows.filter((l) => l.skipped).map((l) => `${l.exerciseId}#${l.setNumber}`),
   };
 }
 
@@ -617,9 +640,12 @@ async function completionBySession(
     where: inArray(schema.exercises.variationId, variationIds),
   });
   const logs = await db.query.setLogs.findMany({
-    where: inArray(
-      schema.setLogs.sessionId,
-      sessions.map((s) => s.id),
+    where: and(
+      inArray(
+        schema.setLogs.sessionId,
+        sessions.map((s) => s.id),
+      ),
+      realLogsOnly,
     ),
   });
 
@@ -686,7 +712,7 @@ export async function listRecentSessions(userId: string, limit = 60): Promise<Hi
     where: inArray(schema.variations.id, [...new Set(finished.map((s) => s.variationId))]),
   });
   const logs = await db.query.setLogs.findMany({
-    where: inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
+    where: and(inArray(schema.setLogs.sessionId, finished.map((s) => s.id)), realLogsOnly),
   });
   // Volume is only honest in kilos, so the unit has to come along.
   const unitByExercise = new Map(
@@ -753,7 +779,7 @@ export async function getHistoryTotals(userId: string): Promise<HistoryTotals> {
   if (!finished.length) return { sessions: 0, sets: 0, reps: 0, volume: 0, completion: null };
 
   const logs = await db.query.setLogs.findMany({
-    where: inArray(schema.setLogs.sessionId, finished.map((s) => s.id)),
+    where: and(inArray(schema.setLogs.sessionId, finished.map((s) => s.id)), realLogsOnly),
   });
   const units = new Map(
     (

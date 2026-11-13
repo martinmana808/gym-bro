@@ -43,6 +43,13 @@
       "when": 1786557350145,
       "tag": "0005_third_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1794605492988,
+      "tag": "0006_bent_bruce_banner",
+      "breakpoints": true
     }
   ]
 }

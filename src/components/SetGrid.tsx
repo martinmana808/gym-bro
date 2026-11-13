@@ -17,11 +17,14 @@ const cellKey = (exerciseId: string, setNumber: number) => `${exerciseId}#${setN
 export function SetGrid({
   blocks,
   entries,
+  skippedKeys,
   activeKey,
   onCellTap,
 }: {
   blocks: RunnerBlock[];
   entries: SetEntry[];
+  /** Sets deliberately passed on — shown as a decision, not an empty gap. */
+  skippedKeys?: ReadonlySet<string>;
   activeKey?: string | null;
   onCellTap: (exerciseId: string, setNumber: number) => void;
 }) {
@@ -43,8 +46,10 @@ export function SetGrid({
                 <div className="flex flex-1 gap-1.5 overflow-x-auto">
                   {Array.from({ length: e.sets }, (_, i) => {
                     const setNumber = i + 1;
-                    const entry = byKey.get(cellKey(e.id, setNumber));
-                    const active = activeKey === cellKey(e.id, setNumber);
+                    const key = cellKey(e.id, setNumber);
+                    const entry = byKey.get(key);
+                    const active = activeKey === key;
+                    const skipped = !entry && (skippedKeys?.has(key) ?? false);
                     return (
                       <button
                         key={setNumber}
@@ -55,18 +60,22 @@ export function SetGrid({
                             ? "border-lime-400 text-lime-400"
                             : entry
                               ? "border-zinc-700 bg-zinc-800/60 text-zinc-100"
-                              : "border-zinc-800 text-zinc-500"
+                              : skipped
+                                ? "border-dashed border-zinc-700 text-zinc-600"
+                                : "border-zinc-800 text-zinc-500"
                         }`}
                       >
-                        {entry
-                          ? entry.timeSeconds != null
-                            ? formatSeconds(entry.timeSeconds)
-                            : entry.weight != null
-                              ? `${formatWeight(entry.weight, e.weightUnit)}×${entry.hitTarget ? "OK" : (entry.reps ?? "?")}`
-                              : entry.hitTarget
-                                ? "OK"
-                                : `${entry.reps ?? "?"}`
-                          : "·"}
+                        {skipped
+                          ? "skip"
+                          : entry
+                            ? entry.timeSeconds != null
+                              ? formatSeconds(entry.timeSeconds)
+                              : entry.weight != null
+                                ? `${formatWeight(entry.weight, e.weightUnit)}×${entry.hitTarget ? "OK" : (entry.reps ?? "?")}`
+                                : entry.hitTarget
+                                  ? "OK"
+                                  : `${entry.reps ?? "?"}`
+                            : "·"}
                       </button>
                     );
                   })}

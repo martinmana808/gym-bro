@@ -294,6 +294,8 @@ export async function logSet(input: LogSetInput) {
     reps: input.reps,
     timeSeconds: input.timeSeconds,
     hitTarget: input.hitTarget ?? false,
+    // Logging a set you'd skipped takes the skip back.
+    skipped: false,
   };
   await db
     .insert(schema.setLogs)
@@ -305,8 +307,61 @@ export async function logSet(input: LogSetInput) {
         reps: values.reps,
         timeSeconds: values.timeSeconds,
         hitTarget: values.hitTarget,
+        skipped: false,
       },
     });
+}
+
+/**
+ * Mark sets as deliberately not done. Stored rather than held in the page so
+ * the rest of the app — the widget's "next up", where a reload resumes, when
+ * the session counts as finished — can see the decision; otherwise it keeps
+ * walking you back to the exercise you just turned down.
+ *
+ * Already-logged sets are left alone: skipping an exercise means "no more of
+ * this today", not "throw away the sets I did do".
+ */
+export async function skipSets(input: {
+  sessionId: string;
+  sets: { exerciseId: string; setNumber: number }[];
+}) {
+  if (!input.sets.length) return;
+  const userId = await requireUserId();
+  const session = await ownedSession(input.sessionId, userId);
+  const db = await getDb();
+  await db
+    .insert(schema.setLogs)
+    .values(
+      input.sets.map((s) => ({
+        sessionId: session.id,
+        exerciseId: s.exerciseId,
+        setNumber: s.setNumber,
+        weight: null,
+        reps: null,
+        timeSeconds: null,
+        hitTarget: false,
+        skipped: true,
+      })),
+    )
+    .onConflictDoNothing({
+      target: [schema.setLogs.sessionId, schema.setLogs.exerciseId, schema.setLogs.setNumber],
+    });
+}
+
+/** Undo skips — all of them, or just one exercise's. Logged sets survive. */
+export async function unskipSets(input: { sessionId: string; exerciseId?: string }) {
+  const userId = await requireUserId();
+  const session = await ownedSession(input.sessionId, userId);
+  const db = await getDb();
+  await db
+    .delete(schema.setLogs)
+    .where(
+      and(
+        eq(schema.setLogs.sessionId, session.id),
+        eq(schema.setLogs.skipped, true),
+        ...(input.exerciseId ? [eq(schema.setLogs.exerciseId, input.exerciseId)] : []),
+      ),
+    );
 }
 
 export async function saveSessionNote(input: {
