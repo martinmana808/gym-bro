@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  clampFinishedAt,
   activeSessionView,
   formatStepTarget,
   hitsTarget,
@@ -271,5 +272,39 @@ describe("hitsTarget", () => {
     expect(hitsTarget(timed, { weight: null, reps: null, timeSeconds: 45 })).toBe(true);
     expect(hitsTarget(timed, { weight: null, reps: null, timeSeconds: 50 })).toBe(true);
     expect(hitsTarget(timed, { weight: null, reps: null, timeSeconds: 40 })).toBe(false);
+  });
+});
+
+describe("clampFinishedAt", () => {
+  const started = new Date("2026-11-23T19:00:00Z");
+  const now = new Date("2026-11-23T21:00:00Z");
+
+  it("keeps the time the workout actually ended", () => {
+    // The whole point: finished at 19:40 in a basement, uploaded at 21:00.
+    // Stamping the upload would invent an eighty-minute session.
+    const ended = new Date("2026-11-23T19:40:00Z");
+    expect(clampFinishedAt(ended.getTime(), started, now)).toEqual(ended);
+  });
+
+  it("falls back to now when the phone sent nothing", () => {
+    expect(clampFinishedAt(undefined, started, now)).toEqual(now);
+  });
+
+  it("refuses a finish before the session began", () => {
+    expect(clampFinishedAt(new Date("2026-11-23T18:00:00Z").getTime(), started, now)).toEqual(now);
+  });
+
+  it("refuses a finish in the future", () => {
+    expect(clampFinishedAt(new Date("2026-11-24T05:00:00Z").getTime(), started, now)).toEqual(now);
+  });
+
+  it("ignores a nonsense number rather than storing an invalid date", () => {
+    expect(clampFinishedAt(NaN, started, now)).toEqual(now);
+    expect(clampFinishedAt(Infinity, started, now)).toEqual(now);
+  });
+
+  it("accepts the exact start and the exact present as the edges", () => {
+    expect(clampFinishedAt(started.getTime(), started, now)).toEqual(started);
+    expect(clampFinishedAt(now.getTime(), started, now)).toEqual(now);
   });
 });

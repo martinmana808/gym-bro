@@ -60,6 +60,26 @@ export function sessionElapsedSeconds(input: SessionClock, nowMs: number): numbe
   return Math.max(0, Math.floor(ms / 1000));
 }
 
+/**
+ * What time to stamp a finished session with.
+ *
+ * A workout finished in a basement at 19:40 may not reach the server until
+ * 21:00, and stamping its arrival would invent an eighty-minute session. So the
+ * phone sends the moment it actually ended — but a phone clock belongs to the
+ * user, so it is held to a range that cannot produce nonsense: never before the
+ * session started, never in the future. Anything outside that falls back to now.
+ */
+export function clampFinishedAt(
+  finishedAtMs: number | undefined,
+  startedAt: Date,
+  now = new Date(),
+): Date {
+  if (finishedAtMs == null || !Number.isFinite(finishedAtMs)) return now;
+  if (finishedAtMs < startedAt.getTime()) return now;
+  if (finishedAtMs > now.getTime()) return now;
+  return new Date(finishedAtMs);
+}
+
 const trim = (n: number) => String(Number(n.toFixed(2)));
 
 /** "40kg / 8rep", "7br / 10rep", "12-15rep", "45s" — compact target for the widget. */

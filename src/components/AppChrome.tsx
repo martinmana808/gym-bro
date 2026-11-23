@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { activeSessionView, type ActiveSessionInput } from "@/lib/activeSession";
 import { SessionWidget } from "@/components/SessionWidget";
+import { startFlusher } from "@/lib/outboxStore";
 
 type Active = ActiveSessionInput & { sessionId: string };
 
@@ -46,6 +47,11 @@ export function AppChrome() {
 
   const onSession = pathname.startsWith("/sessions/");
   const hidden = pathname.startsWith("/signin");
+
+  // The chrome is in the root layout and survives navigation, so this is what
+  // keeps sets recorded offline going up — wherever in the app you happen to
+  // be when the signal comes back, including a session you've since left.
+  useEffect(() => startFlusher(), []);
 
   useEffect(() => {
     if (hidden) return;

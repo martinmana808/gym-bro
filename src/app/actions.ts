@@ -8,6 +8,14 @@ import { getDb, schema } from "@/db";
 import type { Measurement, RepScheme } from "@/db/schema";
 import type { WeightUnit } from "@/lib/workout";
 import { deriveWeeks } from "@/lib/weeks";
+import {
+  ownedSession,
+  removeSkips,
+  writeFinish,
+  writeNote,
+  writeSet,
+  writeSkips,
+} from "@/db/sessionWrites";
 
 export type ExerciseInput = {
   id?: string;
@@ -263,15 +271,6 @@ export async function startSession(dayId: string, variationId?: string) {
   redirect(`/sessions/${session.id}`);
 }
 
-async function ownedSession(sessionId: string, userId: string) {
-  const db = await getDb();
-  const session = await db.query.sessions.findFirst({
-    where: and(eq(schema.sessions.id, sessionId), eq(schema.sessions.userId, userId)),
-  });
-  if (!session) throw new Error("Session not found");
-  return session;
-}
-
 export type LogSetInput = {
   sessionId: string;
   exerciseId: string;
@@ -285,42 +284,9 @@ export type LogSetInput = {
 export async function logSet(input: LogSetInput) {
   const userId = await requireUserId();
   const session = await ownedSession(input.sessionId, userId);
-  const db = await getDb();
-  const values = {
-    sessionId: session.id,
-    exerciseId: input.exerciseId,
-    setNumber: input.setNumber,
-    weight: input.weight,
-    reps: input.reps,
-    timeSeconds: input.timeSeconds,
-    hitTarget: input.hitTarget ?? false,
-    // Logging a set you'd skipped takes the skip back.
-    skipped: false,
-  };
-  await db
-    .insert(schema.setLogs)
-    .values(values)
-    .onConflictDoUpdate({
-      target: [schema.setLogs.sessionId, schema.setLogs.exerciseId, schema.setLogs.setNumber],
-      set: {
-        weight: values.weight,
-        reps: values.reps,
-        timeSeconds: values.timeSeconds,
-        hitTarget: values.hitTarget,
-        skipped: false,
-      },
-    });
+  await writeSet(session.id, input);
 }
 
-/**
- * Mark sets as deliberately not done. Stored rather than held in the page so
- * the rest of the app — the widget's "next up", where a reload resumes, when
- * the session counts as finished — can see the decision; otherwise it keeps
- * walking you back to the exercise you just turned down.
- *
- * Already-logged sets are left alone: skipping an exercise means "no more of
- * this today", not "throw away the sets I did do".
- */
 export async function skipSets(input: {
   sessionId: string;
   sets: { exerciseId: string; setNumber: number }[];
@@ -328,40 +294,13 @@ export async function skipSets(input: {
   if (!input.sets.length) return;
   const userId = await requireUserId();
   const session = await ownedSession(input.sessionId, userId);
-  const db = await getDb();
-  await db
-    .insert(schema.setLogs)
-    .values(
-      input.sets.map((s) => ({
-        sessionId: session.id,
-        exerciseId: s.exerciseId,
-        setNumber: s.setNumber,
-        weight: null,
-        reps: null,
-        timeSeconds: null,
-        hitTarget: false,
-        skipped: true,
-      })),
-    )
-    .onConflictDoNothing({
-      target: [schema.setLogs.sessionId, schema.setLogs.exerciseId, schema.setLogs.setNumber],
-    });
+  await writeSkips(session.id, input.sets);
 }
 
-/** Undo skips — all of them, or just one exercise's. Logged sets survive. */
 export async function unskipSets(input: { sessionId: string; exerciseId?: string }) {
   const userId = await requireUserId();
   const session = await ownedSession(input.sessionId, userId);
-  const db = await getDb();
-  await db
-    .delete(schema.setLogs)
-    .where(
-      and(
-        eq(schema.setLogs.sessionId, session.id),
-        eq(schema.setLogs.skipped, true),
-        ...(input.exerciseId ? [eq(schema.setLogs.exerciseId, input.exerciseId)] : []),
-      ),
-    );
+  await removeSkips(session.id, input.exerciseId);
 }
 
 export async function saveSessionNote(input: {
@@ -371,41 +310,18 @@ export async function saveSessionNote(input: {
 }) {
   const userId = await requireUserId();
   const session = await ownedSession(input.sessionId, userId);
-  const db = await getDb();
-  const note = input.note.trim().slice(0, 500);
-  if (!note) {
-    await db
-      .delete(schema.sessionNotes)
-      .where(
-        and(
-          eq(schema.sessionNotes.sessionId, session.id),
-          eq(schema.sessionNotes.exerciseId, input.exerciseId),
-        ),
-      );
-    return;
-  }
-  await db
-    .insert(schema.sessionNotes)
-    .values({ sessionId: session.id, exerciseId: input.exerciseId, note })
-    .onConflictDoUpdate({
-      target: [schema.sessionNotes.sessionId, schema.sessionNotes.exerciseId],
-      set: { note },
-    });
+  await writeNote(session.id, input.exerciseId, input.note);
 }
 
-export async function finishSession(sessionId: string) {
+/**
+ * `finishedAtMs` is the moment the phone says the workout ended, which is not
+ * the moment this runs: a session finished with no signal uploads later. It is
+ * clamped server-side, so a wrong phone clock can't invent a duration.
+ */
+export async function finishSession(sessionId: string, finishedAtMs?: number) {
   const userId = await requireUserId();
   const session = await ownedSession(sessionId, userId);
-  const db = await getDb();
-  if (!session.finishedAt) {
-    await db
-      .update(schema.sessions)
-      .set({ finishedAt: new Date() })
-      .where(eq(schema.sessions.id, sessionId));
-  }
-  const day = await db.query.days.findFirst({ where: eq(schema.days.id, session.dayId) });
-  revalidatePath(`/workouts/${day!.programId}/days/${session.dayId}`);
-  revalidatePath("/workouts");
+  await writeFinish(session, finishedAtMs);
 }
 
 export async function deleteSession(sessionId: string) {

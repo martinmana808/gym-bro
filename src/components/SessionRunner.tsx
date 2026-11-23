@@ -4,14 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  deleteSession,
-  finishSession,
-  logSet,
-  saveSessionNote,
-  skipSets,
-  unskipSets,
-} from "@/app/actions";
+import { deleteSession } from "@/app/actions";
 import {
   blockLabel,
   buildSteps,
@@ -30,6 +23,7 @@ import { useWakeLock } from "@/lib/useWakeLock";
 import { audioArmed, primeAudio, restAlert } from "@/lib/restAlert";
 import { seedForStep } from "@/lib/setSeed";
 import { clearRestOnServer, setSessionPaused, startRestOnServer } from "@/lib/usePush";
+import { useOutbox, type OutboxStatus } from "@/lib/useOutbox";
 import {
   activeSessionView,
   formatStepTarget,
@@ -122,7 +116,6 @@ export function SessionRunner({
       : null,
   );
   const [justDid, setJustDid] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const [discarding, setDiscarding] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +126,18 @@ export function SessionRunner({
   // "Dismiss" leaves the rest running — it just gets out of the way so you can
   // look around the app. The widget keeps the countdown on screen.
   const [restHidden, setRestHidden] = useState(false);
+  // True once Finish has been pressed, so a finish that is still waiting for
+  // signal can say so instead of silently doing nothing.
+  const wantsSummary = useRef(false);
+
+  // Every write this screen makes goes through the outbox, with signal or
+  // without — see src/lib/outboxStore.ts. The page is only pulled back from the
+  // server when a finish was waiting on it; doing that after every set would
+  // re-render the whole thing once per rep.
+  const onUploaded = useCallback(() => {
+    if (wantsSummary.current) router.refresh();
+  }, [router]);
+  const { send, retry, status: sync } = useOutbox(onUploaded);
 
   const step = setSteps[setIndex];
 
@@ -250,9 +255,7 @@ export function SessionRunner({
     const dropped = new Set(skipped);
     for (const s of sets) dropped.add(logKey(s.exerciseId, s.setNumber));
     setSkipped(dropped);
-    void skipSets({ sessionId, sets }).catch(() =>
-      setError("Could not save the skip — it may come back if you reload."),
-    );
+    send({ kind: "skip", sessionId, sets });
     const i = nextLiveIndex(setIndex, dropped);
     if (i !== -1) setSetIndex(i);
   };
@@ -286,10 +289,10 @@ export function SessionRunner({
 
   const undoSkips = () => {
     setSkipped(new Set());
-    void unskipSets({ sessionId }).catch(() => setError("Could not undo the skips — try again."));
+    send({ kind: "unskip", sessionId });
   };
 
-  const submitSet = async (over?: { reps?: number; ok?: boolean }) => {
+  const submitSet = (over?: { reps?: number; ok?: boolean }) => {
     primeAudio();
     if (!step) return;
     const isTime = step.exercise.measurement === "time";
@@ -305,16 +308,9 @@ export function SessionRunner({
     // The form is pre-filled with the target, so logging it unchanged is what
     // the old OK button used to mean — mark it rather than asking.
     entry.hitTarget = hitsTarget(step.exercise, entry);
-    setSaving(true);
-    setError(null);
-    try {
-      await logSet({ sessionId, ...entry });
-    } catch {
-      setError("Could not save this set — check your connection and try again.");
-      setSaving(false);
-      return;
-    }
-    setSaving(false);
+    // Recorded on the phone first, uploaded behind us. The set is never held
+    // up by the network: a gym with no signal used to stop the workout here.
+    send({ kind: "log", sessionId, ...entry, hitTarget: entry.hitTarget ?? false });
     setLogs((m) => new Map(m).set(logKey(entry.exerciseId, entry.setNumber), entry));
     const key = logKey(entry.exerciseId, entry.setNumber);
     if (skipped.has(key)) {
@@ -334,7 +330,7 @@ export function SessionRunner({
     if (upcoming !== -1) setSetIndex(upcoming);
   };
 
-  const finish = async () => {
+  const finish = () => {
     // Skipped sets are a decision already made, so they don't count as
     // unfinished business — only sets you haven't got to yet do.
     if (
@@ -346,13 +342,10 @@ export function SessionRunner({
       return;
     setFinishing(true);
     void clearRestOnServer(sessionId);
-    try {
-      await finishSession(sessionId);
-      router.refresh();
-    } catch {
-      setError("Could not finish the session — try again.");
-      setFinishing(false);
-    }
+    wantsSummary.current = true;
+    // The time the workout actually ended, not the time it reaches the server:
+    // one finished in a basement may not upload until the drive home.
+    send({ kind: "finish", sessionId, finishedAtMs: Date.now() });
   };
 
   const discard = async () => {
@@ -467,15 +460,22 @@ export function SessionRunner({
               </>
             )}
           </p>
-          <button
-            onClick={finish}
-            disabled={finishing || discarding}
-            className="btn btn-ghost shrink-0 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider hover:!border-red-500/60 hover:!text-red-400"
-          >
-            {finishing ? "Finishing…" : "Finish"}
-          </button>
+          {/* Gone once pressed: the screen underneath says where the workout
+              got to, and a pill still reading "Finishing…" next to "Saved on
+              your phone" just contradicts it. */}
+          {!finishing && (
+            <button
+              onClick={finish}
+              disabled={discarding}
+              className="btn btn-ghost shrink-0 rounded-full px-3 py-1.5 text-xs uppercase tracking-wider hover:!border-red-500/60 hover:!text-red-400"
+            >
+              Finish
+            </button>
+          )}
         </div>
-      {isResting && resting && !restHidden ? (
+      {finishing ? (
+        <FinishingScreen sync={sync} elapsed={elapsed} onRetry={retry} />
+      ) : isResting && resting && !restHidden ? (
         <RestScreen
           remaining={restRemaining}
           total={resting.total}
@@ -570,17 +570,9 @@ export function SessionRunner({
             <TodayNote
               key={step.exercise.id}
               initial={notes.get(step.exercise.id) ?? ""}
-              onSave={async (value) => {
+              onSave={(value) => {
                 setNotes((m) => new Map(m).set(step.exercise.id, value));
-                try {
-                  await saveSessionNote({
-                    sessionId,
-                    exerciseId: step.exercise.id,
-                    note: value,
-                  });
-                } catch {
-                  setError("Could not save the note — try again.");
-                }
+                send({ kind: "note", sessionId, exerciseId: step.exercise.id, note: value });
               }}
             />
           </div>
@@ -647,7 +639,6 @@ export function SessionRunner({
                       key={r}
                       type="button"
                       onClick={() => submitSet({ reps: r })}
-                      disabled={saving}
                       className="btn btn-quiet metric px-4 py-2 text-sm"
                     >
                       {r}
@@ -657,13 +648,14 @@ export function SessionRunner({
           )}
 
           {error && <p className="text-sm text-red-400">{error}</p>}
+          <SyncLine sync={sync} onRetry={retry} />
 
           <button
             onClick={() => submitSet()}
-            disabled={saving || discarding}
+            disabled={discarding}
             className="btn btn-primary w-full py-4 text-lg"
           >
-            {saving ? "Saving…" : alreadyLogged ? "Update set" : "Log set"}
+            {alreadyLogged ? "Update set" : "Log set"}
           </button>
 
           {/* Skipping is a decision, not a navigation accident — so it gets
@@ -672,14 +664,12 @@ export function SessionRunner({
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={skipSet}
-              disabled={saving}
               className="btn btn-ghost py-2.5 text-sm"
             >
               Skip set
             </button>
             <button
               onClick={skipExercise}
-              disabled={saving}
               className="btn btn-ghost py-2.5 text-sm"
             >
               Skip exercise
@@ -773,6 +763,93 @@ function ChromeWidgetSlot({ children }: { children: React.ReactNode }) {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setSlot(document.getElementById(SESSION_WIDGET_SLOT)), []);
   return slot ? createPortal(children, slot) : null;
+}
+
+/**
+ * What the phone is still holding. Silent when there's nothing to say — which,
+ * with signal, is always: the queue drains before this would ever appear.
+ */
+function SyncLine({ sync, onRetry }: { sync: OutboxStatus; onRetry: () => void }) {
+  const total = sync.pending.sets + sync.pending.other;
+  const anyPending = total > 0;
+  // Connected, a set is up in well under a second. Holding the line back a beat
+  // stops it flashing on every single tap. Keyed on "is anything pending" and
+  // not on the count, so logging quickly doesn't keep restarting the wait.
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    if (!anyPending) return;
+    const id = setTimeout(() => setWaited(true), 1200);
+    // Reset on the way out, so the next spell of no signal waits its beat too.
+    return () => {
+      clearTimeout(id);
+      setWaited(false);
+    };
+  }, [anyPending]);
+
+  if (sync.problem) {
+    return (
+      <p className="text-sm text-red-400">
+        {sync.problem}{" "}
+        <button
+          onClick={onRetry}
+          className="underline decoration-dotted underline-offset-2 hover:text-red-300"
+        >
+          Try again
+        </button>
+      </p>
+    );
+  }
+  if (!anyPending) {
+    return sync.justSaved ? <p className="text-sm text-lime-400">Saved</p> : null;
+  }
+  if (!waited && !sync.stuck) return null;
+
+  const { sets } = sync.pending;
+  const what = sets > 0 ? `${sets} set${sets === 1 ? "" : "s"}` : "Changes";
+  return (
+    <p className={`text-sm ${sync.stuck ? "text-amber-400" : "text-zinc-400"}`}>
+      {sync.stuck
+        ? `Can't reach the server — ${what.toLowerCase()} still on your phone. Still trying.`
+        : `${what} waiting to upload`}
+    </p>
+  );
+}
+
+/**
+ * Between pressing Finish and the server knowing about it. With signal that's a
+ * blink and the summary replaces it. Without, this is where the workout ends:
+ * it says the work is safe and that the app can be closed, because the
+ * alternative — a spinner that never resolves — reads as lost data.
+ */
+function FinishingScreen({
+  sync,
+  elapsed,
+  onRetry,
+}: {
+  sync: OutboxStatus;
+  elapsed: string;
+  onRetry: () => void;
+}) {
+  const waiting = sync.pending.sets + sync.pending.other > 0;
+  if (!waiting) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+        <p className="text-5xl">🏁</p>
+        <h2 className="text-3xl font-bold tracking-tight">Finishing…</h2>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-1 flex-col items-center justify-center gap-4 text-center">
+      <p className="text-5xl">✅</p>
+      <h2 className="text-3xl font-bold tracking-tight">Saved on your phone</h2>
+      <p className="max-w-xs text-zinc-400">
+        Workout done — <span className="display-num">{elapsed}</span>. It uploads on its own
+        as soon as you have signal, so you can close the app.
+      </p>
+      <SyncLine sync={sync} onRetry={onRetry} />
+    </div>
+  );
 }
 
 function TodayNote({
