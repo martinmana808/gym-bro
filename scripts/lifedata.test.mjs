@@ -5,6 +5,11 @@ import path from "node:path";
 import {
   appendBlocks,
   blockFor,
+  doneLines,
+  kg,
+  muscleFields,
+  MUSCLES,
+  muscleOf,
   blocksToAppend,
   dayStart,
   lastBlockFor,
@@ -30,7 +35,20 @@ const session = (over = {}) => ({
   finished: true,
   logged: 23,
   planned: 26,
+  reps: 262,
+  volume: 8280.5,
   exercises: [],
+  ...over,
+});
+
+const ex = (name, sets, logged, over = {}) => ({
+  name,
+  sets,
+  logged,
+  reps: logged * 10,
+  volume: logged * 100,
+  unit: "kg",
+  maxWeight: 20,
   ...over,
 });
 
@@ -76,14 +94,24 @@ describe("the 04:00 day", () => {
 
 describe("the summary line", () => {
   it("uses Martin's fields, in his order", () => {
-    expect(sessionFields(session())).toEqual([
+    expect(sessionFields(session({ exercises: [ex("Remo alto", 3, 3)] }))).toEqual([
       "workout: Pequeño Putarraco",
       "day: Day 2",
       "at: 20:58",
       "duration: 57min",
       "done: 88%",
       "sets: 23/26",
+      "reps: 262",
+      "volume: 8,281kg",
+      "muscles: back",
     ]);
+  });
+
+  it("groups kilos the way he writes them", () => {
+    expect(kg(8450)).toBe("8,450kg");
+    expect(kg(1957.5)).toBe("1,958kg");
+    expect(kg(0)).toBe("0kg");
+    expect(kg(null)).toBe("0kg");
   });
 
   it("does not count paused time as training", () => {
@@ -111,9 +139,7 @@ describe("the summary line", () => {
   });
 });
 
-describe("the detail lines", () => {
-  const ex = (name, sets, logged) => ({ name, sets, logged });
-
+describe("the skipped lines", () => {
   it("names an exercise that got nothing at all", () => {
     expect(skipLines([ex("Face pulls", 3, 0)])).toEqual(["skipped exercise: Face pulls (3 sets)"]);
   });
@@ -135,19 +161,119 @@ describe("the detail lines", () => {
   });
 });
 
-describe("a day's block", () => {
-  it("is one summary line plus its details", () => {
-    const block = blockFor(
-      "2026-11-12",
-      [session({ exercises: [{ name: "Dominadas neutras", sets: 3, logged: 0 }] })],
+describe("the done lines", () => {
+  it("gives an exercise its sets, reps and kilos", () => {
+    expect(doneLines([ex("Remo alto", 3, 3, { reps: 27, volume: 1957.5 })])).toEqual([
+      "done: Remo alto · 3 sets · 27 reps · 1,958kg",
+    ]);
+  });
+
+  it("says one set, not one sets", () => {
+    expect(doneLines([ex("Plancha", 1, 1, { reps: 8, volume: 0 })])).toEqual([
+      "done: Plancha · 1 set · 8 reps · 0kg",
+    ]);
+  });
+
+  it("leaves a bodyweight exercise at zero kilos, with nothing else to say", () => {
+    expect(
+      doneLines([ex("Dominadas neutras", 3, 3, { reps: 24, volume: 0, maxWeight: null })]),
+    ).toEqual(["done: Dominadas neutras · 3 sets · 24 reps · 0kg"]);
+  });
+
+  it("carries the setting a machine was on when its unit is not kilos", () => {
+    expect(
+      doneLines([
+        ex("Peck deck", 3, 3, { reps: 45, volume: 0, unit: "bricks", maxWeight: 6 }),
+      ]),
+    ).toEqual(["done: Peck deck · 3 sets · 45 reps · 0kg · load: 6 bricks"]);
+  });
+
+  it("says nothing about an exercise he never logged", () => {
+    expect(doneLines([ex("Remo alto", 3, 0)])).toEqual([]);
+  });
+});
+
+describe("muscles", () => {
+  it("reads a name whatever its spacing and case", () => {
+    expect(muscleOf("  Remo   Alto ")).toBe("back");
+    expect(muscleOf("Peck deck")).toBe("chest");
+  });
+
+  it("knows when it does not know", () => {
+    expect(muscleOf("Cinta de correr")).toBeNull();
+  });
+
+  it("puts the busiest muscle first", () => {
+    expect(
+      muscleFields([ex("Vuelos laterales", 3, 3), ex("Sentadillas libres", 9, 9)]),
+    ).toEqual(["muscles: quads, shoulders"]);
+  });
+
+  it("breaks a tie on the order of the workout, so a re-run renders the same", () => {
+    const fields = muscleFields([
+      ex("Sillon de abductores (abrir)", 3, 3),
+      ex("Camilla de isquio", 3, 3),
+    ]);
+    expect(fields).toEqual(["muscles: glutes, hamstrings"]);
+  });
+
+  it("counts only what he logged — a skipped exercise trained nothing", () => {
+    expect(muscleFields([ex("Remo alto", 3, 3), ex("Vuelos laterales", 3, 0)])).toEqual([
+      "muscles: back",
+    ]);
+  });
+
+  it("names an exercise it has no muscle for instead of guessing one", () => {
+    expect(muscleFields([ex("Remo alto", 3, 3), ex("Cinta de correr", 2, 2)])).toEqual([
+      "muscles: back",
+      "unmapped: Cinta de correr",
+    ]);
+  });
+
+  it("names an unknown exercise once, however many times it appears", () => {
+    expect(muscleFields([ex("Cinta de correr", 1, 1), ex("Cinta de correr", 1, 1)])).toEqual([
+      "unmapped: Cinta de correr",
+    ]);
+  });
+
+  it("has nothing to say about a session with no logged sets", () => {
+    expect(muscleFields([ex("Remo alto", 3, 0)])).toEqual([]);
+  });
+
+  it("leaves an unknown exercise he skipped alone — it distorted nothing", () => {
+    expect(muscleFields([ex("Remo alto", 3, 3), ex("Cinta de correr", 2, 0)])).toEqual([
+      "muscles: back",
+    ]);
+  });
+
+  it("covers every exercise in his programme", () => {
+    // The map is the only thing standing between a real exercise and
+    // "unmapped", so a rename has to show up here and not in the file.
+    expect(Object.keys(MUSCLES)).toHaveLength(25);
+    expect(new Set(Object.values(MUSCLES))).toEqual(
+      new Set(["chest", "back", "biceps", "triceps", "shoulders", "quads", "hamstrings", "glutes"]),
     );
+  });
+});
+
+describe("a day's block", () => {
+  it("is one summary line, then what was done, then what was not", () => {
+    const block = blockFor("2026-11-12", [
+      session({
+        exercises: [
+          ex("Dominadas neutras", 3, 0),
+          ex("Remo alto", 3, 3, { reps: 27, volume: 1957.5 }),
+        ],
+      }),
+    ]);
     expect(block).toBe(
-      "2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26\n" +
+      "2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 262 · volume: 8,281kg · muscles: back\n" +
+        "  - done: Remo alto · 3 sets · 27 reps · 1,958kg\n" +
         "  - skipped exercise: Dominadas neutras (3 sets)",
     );
   });
 
-  it("is a bare summary line when nothing was missed", () => {
+  it("is a bare summary line when there is nothing to detail", () => {
     expect(blockFor("2026-11-12", [session({ logged: 26, exercises: [] })]).split("\n")).toHaveLength(1);
   });
 
@@ -162,6 +288,9 @@ describe("a day's block", () => {
       endedAt: at("2026-11-12T11:30:00Z"),
       logged: 10,
       planned: 10,
+      reps: 100,
+      volume: 2000,
+      exercises: [ex("Press plano", 10, 10, { reps: 100, volume: 2000 })],
     });
     const evening = session({
       day: "Day 3",
@@ -169,19 +298,23 @@ describe("a day's block", () => {
       endedAt: at("2026-11-12T23:40:00Z"),
       logged: 6,
       planned: 8,
-      exercises: [{ name: "Face pulls", sets: 2, logged: 0 }],
+      reps: 60,
+      volume: 450,
+      exercises: [ex("Vuelos laterales", 6, 6, { reps: 60, volume: 450 }), ex("Face pulls", 2, 0)],
     });
     const lines = blockFor("2026-11-12", [morning, evening]).split("\n");
     expect(lines[0]).toBe(
-      "2026-11-12 · sessions: 2 · workout: Pequeño Putarraco · day: Day 1, Day 3 · at: 08:00 · duration: 70min · done: 89% · sets: 16/18",
+      "2026-11-12 · sessions: 2 · workout: Pequeño Putarraco · day: Day 1, Day 3 · at: 08:00 · duration: 70min · done: 89% · sets: 16/18 · reps: 160 · volume: 2,450kg · muscles: chest, shoulders",
     );
     expect(lines[1]).toBe(
-      "  - session 1 · workout: Pequeño Putarraco · day: Day 1 · at: 08:00 · duration: 30min · done: 100% · sets: 10/10",
+      "  - session 1 · workout: Pequeño Putarraco · day: Day 1 · at: 08:00 · duration: 30min · done: 100% · sets: 10/10 · reps: 100 · volume: 2,000kg · muscles: chest",
     );
-    expect(lines[2]).toBe(
-      "  - session 2 · workout: Pequeño Putarraco · day: Day 3 · at: 20:00 · duration: 40min · done: 75% · sets: 6/8",
+    expect(lines[2]).toBe("  - done: Press plano · 10 sets · 100 reps · 2,000kg");
+    expect(lines[3]).toBe(
+      "  - session 2 · workout: Pequeño Putarraco · day: Day 3 · at: 20:00 · duration: 40min · done: 75% · sets: 6/8 · reps: 60 · volume: 450kg · muscles: shoulders",
     );
-    expect(lines[3]).toBe("  - skipped exercise: Face pulls (2 sets)");
+    expect(lines[4]).toBe("  - done: Vuelos laterales · 6 sets · 60 reps · 450kg");
+    expect(lines[5]).toBe("  - skipped exercise: Face pulls (2 sets)");
   });
 });
 

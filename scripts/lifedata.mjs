@@ -5,7 +5,8 @@
  * The folder holds one markdown file per app; a Claude session reads the folder
  * to say how his days went. This writes `Gym-bro.md`:
  *
- *   2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26
+ *   2026-11-12 · workout: … · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 212 · volume: 8,450kg · muscles: back, triceps
+ *     - done: Remo alto · 3 sets · 30 reps · 1,350kg
  *     - skipped exercise: Dominadas neutras (3 sets)
  *
  * It runs on this Mac under launchd, where Google Drive for desktop mounts the
@@ -36,6 +37,48 @@ export const FILE_NAME = "Gym-bro.md";
 export const FOLDER_NAME = "Life data";
 /** Martin's day runs 04:00 to 03:59, so a 01:00 workout belongs to the day before. */
 export const DAY_STARTS_AT_HOUR = 4;
+
+/**
+ * Which muscle each exercise trains. The exercises table has no muscle column,
+ * so this is the map — one primary muscle per exercise, which keeps "most sets
+ * first" a thing you can count. Nothing is guessed at run time: an exercise
+ * that is not in here is named on the line as `unmapped:` so it gets noticed
+ * and added, rather than quietly filed under the wrong muscle.
+ */
+export const MUSCLES = {
+  // chest
+  "press plano": "chest",
+  "press plano c/mancuernas": "chest",
+  "flexiones de brazos": "chest",
+  "aperturas planas": "chest",
+  "empuje de pectoral": "chest",
+  "peck deck": "chest",
+  // back
+  "dominadas neutras": "back",
+  "remo alto": "back",
+  "dorsales al pecho (amplio)": "back",
+  "remo a 1 brazo (banco)": "back",
+  "pull over (lento)": "back",
+  // arms
+  "biceps alternado": "biceps",
+  "biceps barra recta": "biceps",
+  "biceps polea c/soga": "biceps",
+  "triceps tras nuca 1 brazo": "triceps",
+  "triceps pata de burro": "triceps",
+  "triceps polea c/barra angulo": "triceps",
+  // shoulders
+  "press hombros alternado": "shoulders",
+  "vuelos laterales": "shoulders",
+  "vuelos frontal con disco": "shoulders",
+  // legs
+  "sillon de cuadriceps 1 pierna": "quads",
+  "sillon de cuadriceps 2 piernas": "quads",
+  "sentadillas libres": "quads",
+  "camilla de isquio": "hamstrings",
+  "sillon de abductores (abrir)": "glutes",
+};
+
+export const muscleOf = (name) => MUSCLES[name.trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -111,6 +154,9 @@ export function sessionFields(s) {
     `duration: ${minutesOf(s.endedAt.getTime() - s.startedAt.getTime() - s.pausedMs)}min`,
     `done: ${percent(s.logged, s.planned)}%`,
     `sets: ${s.logged}/${s.planned}`,
+    `reps: ${s.reps}`,
+    `volume: ${kg(s.volume)}`,
+    ...muscleFields(s.exercises),
   ];
   if (!s.finished) fields.push("status: unfinished");
   return fields;
@@ -118,6 +164,68 @@ export function sessionFields(s) {
 
 export const percent = (logged, planned) =>
   planned > 0 ? Math.round((logged / planned) * 100) : 0;
+
+/** Kilos, grouped the way he writes them: 8450 -> "8,450kg". */
+export const kg = (n) => `${Math.round(n ?? 0).toLocaleString("en-US")}kg`;
+
+/**
+ * `muscles:` — what the session actually trained, the busiest first. Only sets
+ * he logged count: an exercise he skipped trained nothing. Ties go to whichever
+ * came first in the workout, so the same session always renders the same
+ * string and a re-run has nothing to append.
+ */
+export function muscleFields(exercises) {
+  const sets = new Map();
+  const firstAt = new Map();
+  const unmapped = [];
+  exercises.forEach((e, i) => {
+    if (e.logged <= 0) return;
+    const muscle = muscleOf(e.name);
+    if (!muscle) {
+      if (!unmapped.includes(e.name)) unmapped.push(e.name);
+      return;
+    }
+    sets.set(muscle, (sets.get(muscle) ?? 0) + e.logged);
+    if (!firstAt.has(muscle)) firstAt.set(muscle, i);
+  });
+
+  const ordered = [...sets.entries()]
+    .sort((a, b) => b[1] - a[1] || firstAt.get(a[0]) - firstAt.get(b[0]))
+    .map(([muscle]) => muscle);
+
+  const fields = [];
+  if (ordered.length) fields.push(`muscles: ${ordered.join(", ")}`);
+  if (unmapped.length) fields.push(`unmapped: ${unmapped.join(", ")}`);
+  return fields;
+}
+
+/**
+ * A line per exercise he actually did, so reps and kilos can be read one
+ * exercise at a time.
+ *
+ * `0kg` is the truth for a bodyweight pull-up. It is also what a machine
+ * measured in bricks has to say, because nothing here knows what a brick
+ * weighs — so those lines carry the setting they were on instead of
+ * pretending the work was nothing.
+ */
+export function doneLines(exercises) {
+  return exercises
+    .filter((e) => e.logged > 0)
+    .map((e) => {
+      const parts = [
+        `done: ${e.name}`,
+        `${e.logged} ${e.logged === 1 ? "set" : "sets"}`,
+        `${e.reps} reps`,
+        kg(e.volume),
+      ];
+      if (e.unit !== "kg" && e.maxWeight != null) {
+        parts.push(`load: ${trim(e.maxWeight)} ${e.unit}`);
+      }
+      return parts.join(SEP);
+    });
+}
+
+const trim = (n) => String(Math.round(n * 100) / 100);
 
 /**
  * Detail lines for what the plan asked for and didn't get.
@@ -155,27 +263,32 @@ export function blockFor(date, sessions) {
 
   if (sessions.length === 1) {
     const [s] = sessions;
+    detail.push(...doneLines(s.exercises));
     detail.push(...skipLines(s.exercises));
     return render(date, sessionFields(s), detail);
   }
 
-  const logged = sessions.reduce((n, s) => n + s.logged, 0);
-  const planned = sessions.reduce((n, s) => n + s.planned, 0);
+  const total = (f) => sessions.reduce((n, s) => n + f(s), 0);
+  const logged = total((s) => s.logged);
+  const planned = total((s) => s.planned);
   const programs = [...new Set(sessions.map((s) => s.program))];
   const summary = [
     `sessions: ${sessions.length}`,
     `workout: ${programs.join(", ")}`,
     `day: ${sessions.map((s) => s.day).join(", ")}`,
     `at: ${localTime(sessions[0].startedAt)}`,
-    `duration: ${sessions.reduce(
-      (n, s) => n + minutesOf(s.endedAt.getTime() - s.startedAt.getTime() - s.pausedMs),
-      0,
+    `duration: ${total((s) =>
+      minutesOf(s.endedAt.getTime() - s.startedAt.getTime() - s.pausedMs),
     )}min`,
     `done: ${percent(logged, planned)}%`,
     `sets: ${logged}/${planned}`,
+    `reps: ${total((s) => s.reps)}`,
+    `volume: ${kg(total((s) => s.volume))}`,
+    ...muscleFields(sessions.flatMap((s) => s.exercises)),
   ];
   sessions.forEach((s, i) => {
     detail.push(`session ${i + 1}${SEP}${sessionFields(s).join(SEP)}`);
+    detail.push(...doneLines(s.exercises));
     detail.push(...skipLines(s.exercises));
   });
   return render(date, summary, detail);
@@ -300,7 +413,17 @@ async function readDays(sql, dates) {
              (select count(*)::int from set_logs l
                where l.session_id = s.id and l.skipped = false) as logged,
              (select coalesce(sum(e.sets), 0)::int from exercises e
-               where e.variation_id = s.variation_id) as planned
+               where e.variation_id = s.variation_id) as planned,
+             (select coalesce(sum(l.reps), 0)::int from set_logs l
+               where l.session_id = s.id and l.skipped = false) as reps,
+             -- Kilos only. A machine measured in bricks has no honest kilo
+             -- figure, and the app's own History screen leaves it out the
+             -- same way, so the two numbers agree.
+             (select coalesce(sum(l.weight_kg * l.reps), 0)::float
+                from set_logs l
+                join exercises ex on ex.id = l.exercise_id
+               where l.session_id = s.id and l.skipped = false
+                 and ex.weight_unit = 'kg') as volume
         from sessions s
         join days d on d.id = s.day_id
         join programs p on p.id = d.program_id
@@ -311,12 +434,18 @@ async function readDays(sql, dates) {
     if (!rows.length) return { user, byDate: new Map() };
 
     const perExercise = await sql`
-      select s.id as session_id, e.name, e.sets,
-             (select count(*)::int from set_logs l
-               where l.session_id = s.id and l.exercise_id = e.id and l.skipped = false) as logged
+      select s.id as session_id, e.name, e.sets, e.weight_unit,
+             count(l.id)::int as logged,
+             coalesce(sum(l.reps), 0)::int as reps,
+             coalesce(sum(case when e.weight_unit = 'kg'
+                                then l.weight_kg * l.reps end), 0)::float as volume,
+             max(l.weight_kg)::float as max_weight
         from sessions s
         join exercises e on e.variation_id = s.variation_id
+        left join set_logs l
+          on l.session_id = s.id and l.exercise_id = e.id and l.skipped = false
        where s.id in ${sql(rows.map((r) => r.id))}
+       group by s.id, e.id, e.name, e.sets, e.weight_unit, e.position
        order by s.id, e.position`;
 
     const byDate = new Map();
@@ -336,9 +465,19 @@ async function readDays(sql, dates) {
         finished,
         logged: r.logged,
         planned: r.planned,
+        reps: r.reps,
+        volume: r.volume,
         exercises: perExercise
           .filter((e) => e.session_id === r.id)
-          .map((e) => ({ name: e.name, sets: e.sets, logged: e.logged })),
+          .map((e) => ({
+            name: e.name,
+            sets: e.sets,
+            logged: e.logged,
+            reps: e.reps,
+            volume: e.volume,
+            unit: e.weight_unit,
+            maxWeight: e.max_weight,
+          })),
       };
       if (!byDate.has(date)) byDate.set(date, []);
       byDate.get(date).push(session);
