@@ -117,6 +117,8 @@ export function sessionFields(s) {
     `volume: ${kg(s.volume)}`,
     ...muscleFields(s.exercises),
   ];
+  // Added after the fields he already had, so nothing above shifts.
+  if (s.finished) fields.push(`ended: ${localTime(s.endedAt)}`);
   if (!s.finished) fields.push("status: unfinished");
   return fields;
 }
@@ -167,8 +169,12 @@ export function muscleFields(exercises) {
 }
 
 /**
- * A line per exercise he actually did, so reps and kilos can be read one
- * exercise at a time.
+ * A line per exercise he actually did, with every set he logged underneath it.
+ *
+ * The exercise line is the total; the sub-lines are the rows themselves, in
+ * set order, exactly as the app stored them — weight, reps, the minute it was
+ * logged. A planned set with no row is listed as `not logged`, so the
+ * numbering is complete and you can see which one he stopped at.
  *
  * `0kg` is the truth for a bodyweight pull-up. It is also what a machine
  * measured in bricks has to say, because nothing here knows what a brick
@@ -188,8 +194,57 @@ export function doneLines(exercises) {
       if (e.unit !== "kg" && e.maxWeight != null) {
         parts.push(`load: ${trim(e.maxWeight)} ${e.unit}`);
       }
-      return parts.join(SEP);
+      const target = targetOf(e);
+      if (target) parts.push(`target: ${e.sets} × ${target}`);
+      return { line: parts.join(SEP), sub: setLines(e) };
     });
+}
+
+/**
+ * What the plan asked of one exercise, in the app's own words — a fixed rep
+ * count, a range, to failure, or a time. The target weight rides along when
+ * one is set.
+ */
+export function targetOf(e) {
+  let target;
+  if (e.measurement === "time") target = `${e.planTimeSeconds ?? 0}s`;
+  else if (e.repScheme === "failure") target = "to failure";
+  else if (e.repScheme === "range") target = `${e.repsMin}–${e.repsMax} reps`;
+  else if (e.repsMin != null) target = `${e.repsMin} reps`;
+  else return null;
+  const weight = load(e.targetWeight, e.unit);
+  return weight ? `${target} @ ${weight}` : target;
+}
+
+/** "72.5kg" | "6 bricks" | null — a weight as the app stored it. */
+export const load = (weight, unit) =>
+  weight == null ? null : unit === "kg" ? `${trim(weight)}kg` : `${trim(weight)} ${unit}`;
+
+/**
+ * One line per set: the row as it is, nothing derived. The reps are always the
+ * number he logged; `target hit` is the app's own flag on top of it, the one
+ * the History screen draws as "OK".
+ */
+export function setLines(e) {
+  const byNumber = new Map((e.sets_ ?? []).map((l) => [l.setNumber, l]));
+  const highest = Math.max(e.sets, ...[...byNumber.keys()], 0);
+  const lines = [];
+  for (let n = 1; n <= highest; n++) {
+    const l = byNumber.get(n);
+    if (!l) {
+      lines.push(`set ${n}${SEP}not logged`);
+      continue;
+    }
+    const parts = [`set ${n}`];
+    const weight = load(l.weight, e.unit);
+    const effort = l.timeSeconds != null ? `${l.timeSeconds}s` : `${l.reps ?? "?"} reps`;
+    parts.push(l.skipped ? "skipped" : weight ? `${weight} × ${effort}` : effort);
+    if (!l.skipped && l.hitTarget) parts.push("target hit");
+    if (l.loggedAt) parts.push(localTime(l.loggedAt));
+    lines.push(parts.join(SEP));
+  }
+  if (e.note) lines.push(`note: ${e.note}`);
+  return lines;
 }
 
 const trim = (n) => String(Math.round(n * 100) / 100);
@@ -262,14 +317,22 @@ export function blockFor(date, sessions) {
 }
 
 const render = (date, fields, detail) =>
-  [date + SEP + fields.join(SEP), ...detail.map((d) => `  - ${d}`)].join("\n");
+  [
+    date + SEP + fields.join(SEP),
+    ...detail.flatMap((d) =>
+      typeof d === "string"
+        ? [`  - ${d}`]
+        : [`  - ${d.line}`, ...d.sub.map((line) => `    - ${line}`)],
+    ),
+  ].join("\n");
 
 // ---------------------------------------------------------------- the file
 
 const DATED = /^(\d{4}-\d{2}-\d{2}) · /;
 
 /**
- * Every block already in the file, in order. Append-only means a date can
+ * Every block already in the file, in order. A detail line starts with two
+ * spaces and "- ", a sub-detail with four. Append-only means a date can
  * appear several times; the reader takes the last one as true, so that is the
  * one a new run compares itself against.
  */
@@ -279,7 +342,7 @@ export function parseBlocks(text) {
     const dated = DATED.exec(line);
     if (dated) {
       blocks.push({ date: dated[1], lines: [line] });
-    } else if (blocks.length && /^ {2}- /.test(line)) {
+    } else if (blocks.length && /^ {2,}- /.test(line)) {
       blocks[blocks.length - 1].lines.push(line);
     }
   }
@@ -401,8 +464,11 @@ async function readDays(sql, dates) {
     if (!rows.length) return { user, byDate: new Map() };
 
     const perExercise = await sql`
-      select s.id as session_id, e.name, e.sets, e.weight_unit,
-             e.section_name,
+      select s.id as session_id, e.id as exercise_id, e.name, e.sets, e.weight_unit,
+             e.section_name, e.measurement, e.rep_scheme, e.reps_min, e.reps_max,
+             e.time_seconds as plan_time_seconds, e.target_weight,
+             (select n.note from session_notes n
+               where n.session_id = s.id and n.exercise_id = e.id) as note,
              count(l.id)::int as logged,
              coalesce(sum(l.reps), 0)::int as reps,
              coalesce(sum(case when e.weight_unit = 'kg'
@@ -413,8 +479,18 @@ async function readDays(sql, dates) {
         left join set_logs l
           on l.session_id = s.id and l.exercise_id = e.id and l.skipped = false
        where s.id in ${sql(rows.map((r) => r.id))}
-       group by s.id, e.id, e.name, e.sets, e.weight_unit, e.section_name, e.position
+       group by s.id, e.id, e.name, e.sets, e.weight_unit, e.section_name,
+                e.measurement, e.rep_scheme, e.reps_min, e.reps_max,
+                e.time_seconds, e.target_weight, e.position
        order by s.id, e.position`;
+
+    // Every row, so the block can show the sets themselves and not just totals.
+    const perSet = await sql`
+      select l.session_id, l.exercise_id, l.set_number, l.weight_kg, l.reps,
+             l.time_seconds, l.hit_target, l.skipped, l.created_at
+        from set_logs l
+       where l.session_id in ${sql(rows.map((r) => r.id))}
+       order by l.session_id, l.exercise_id, l.set_number`;
 
     const byDate = new Map();
     for (const r of rows) {
@@ -446,6 +522,24 @@ async function readDays(sql, dates) {
             volume: e.volume,
             unit: e.weight_unit,
             maxWeight: e.max_weight,
+            measurement: e.measurement,
+            repScheme: e.rep_scheme,
+            repsMin: e.reps_min,
+            repsMax: e.reps_max,
+            planTimeSeconds: e.plan_time_seconds,
+            targetWeight: e.target_weight,
+            note: e.note,
+            sets_: perSet
+              .filter((l) => l.session_id === r.id && l.exercise_id === e.exercise_id)
+              .map((l) => ({
+                setNumber: l.set_number,
+                weight: l.weight_kg,
+                reps: l.reps,
+                timeSeconds: l.time_seconds,
+                hitTarget: l.hit_target,
+                skipped: l.skipped,
+                loggedAt: l.created_at,
+              })),
           })),
       };
       if (!byDate.has(date)) byDate.set(date, []);

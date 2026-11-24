@@ -6,6 +6,9 @@ import {
   appendBlocks,
   blockFor,
   doneLines,
+  load,
+  setLines,
+  targetOf,
   kg,
   muscleFields,
   blocksToAppend,
@@ -62,6 +65,26 @@ const ex = (name, sets, logged, over = {}) => ({
   volume: logged * 100,
   unit: "kg",
   maxWeight: 20,
+  measurement: "reps",
+  repScheme: "fixed",
+  repsMin: 10,
+  repsMax: null,
+  planTimeSeconds: null,
+  targetWeight: null,
+  note: null,
+  sets_: [],
+  ...over,
+});
+
+// A logged row, as set_logs holds it.
+const set = (setNumber, over = {}) => ({
+  setNumber,
+  weight: 40,
+  reps: 10,
+  timeSeconds: null,
+  hitTarget: false,
+  skipped: false,
+  loggedAt: at("2026-11-12T23:00:00Z"), // 20:00
   ...over,
 });
 
@@ -117,6 +140,7 @@ describe("the summary line", () => {
       "reps: 262",
       "volume: 8,281kg",
       "muscles: Espalda",
+      "ended: 21:55",
     ]);
   });
 
@@ -175,34 +199,130 @@ describe("the skipped lines", () => {
 });
 
 describe("the done lines", () => {
+  const line = (e) => doneLines([e])[0].line;
+
   it("gives an exercise its sets, reps and kilos", () => {
-    expect(doneLines([ex("Remo alto", 3, 3, { reps: 27, volume: 1957.5 })])).toEqual([
-      "done: Remo alto · 3 sets · 27 reps · 1,958kg",
-    ]);
+    expect(line(ex("Remo alto", 3, 3, { reps: 27, volume: 1957.5 }))).toBe(
+      "done: Remo alto · 3 sets · 27 reps · 1,958kg · target: 3 × 10 reps",
+    );
   });
 
   it("says one set, not one sets", () => {
-    expect(doneLines([ex("Plancha", 1, 1, { reps: 8, volume: 0 })])).toEqual([
-      "done: Plancha · 1 set · 8 reps · 0kg",
-    ]);
+    expect(line(ex("Plancha", 1, 1, { reps: 8, volume: 0, repsMin: 8 }))).toBe(
+      "done: Plancha · 1 set · 8 reps · 0kg · target: 1 × 8 reps",
+    );
   });
 
   it("leaves a bodyweight exercise at zero kilos, with nothing else to say", () => {
     expect(
-      doneLines([ex("Dominadas neutras", 3, 3, { reps: 24, volume: 0, maxWeight: null })]),
-    ).toEqual(["done: Dominadas neutras · 3 sets · 24 reps · 0kg"]);
+      line(ex("Dominadas neutras", 3, 3, { reps: 24, volume: 0, maxWeight: null, repsMin: 8 })),
+    ).toBe("done: Dominadas neutras · 3 sets · 24 reps · 0kg · target: 3 × 8 reps");
   });
 
   it("carries the setting a machine was on when its unit is not kilos", () => {
     expect(
-      doneLines([
-        ex("Peck deck", 3, 3, { reps: 45, volume: 0, unit: "bricks", maxWeight: 6 }),
-      ]),
-    ).toEqual(["done: Peck deck · 3 sets · 45 reps · 0kg · load: 6 bricks"]);
+      line(ex("Peck deck", 3, 3, { reps: 45, volume: 0, unit: "bricks", maxWeight: 6, repsMin: 15 })),
+    ).toBe("done: Peck deck · 3 sets · 45 reps · 0kg · load: 6 bricks · target: 3 × 15 reps");
   });
 
   it("says nothing about an exercise he never logged", () => {
     expect(doneLines([ex("Remo alto", 3, 0)])).toEqual([]);
+  });
+});
+
+describe("the target the plan set", () => {
+  it("reads a fixed rep count", () => {
+    expect(targetOf(ex("Remo alto", 3, 3, { repsMin: 10 }))).toBe("10 reps");
+  });
+
+  it("reads a range", () => {
+    expect(
+      targetOf(ex("Camilla de isquio", 3, 3, { repScheme: "range", repsMin: 10, repsMax: 15 })),
+    ).toBe("10–15 reps");
+  });
+
+  it("reads to failure", () => {
+    expect(targetOf(ex("Remo alto", 3, 3, { repScheme: "failure", repsMin: null }))).toBe(
+      "to failure",
+    );
+  });
+
+  it("reads a timed exercise in seconds", () => {
+    expect(
+      targetOf(ex("Plancha", 3, 3, { measurement: "time", planTimeSeconds: 45 })),
+    ).toBe("45s");
+  });
+
+  it("adds the target weight in the unit it was set in", () => {
+    expect(targetOf(ex("Remo alto", 3, 3, { targetWeight: 45 }))).toBe("10 reps @ 45kg");
+    expect(
+      targetOf(ex("Peck deck", 3, 3, { unit: "bricks", targetWeight: 6 })),
+    ).toBe("10 reps @ 6 bricks");
+  });
+
+  it("says nothing when the plan set nothing", () => {
+    expect(targetOf(ex("Remo alto", 3, 3, { repsMin: null }))).toBeNull();
+    expect(load(null, "kg")).toBeNull();
+  });
+});
+
+describe("the set lines", () => {
+  it("is one line per row, weight by reps, with the minute he logged it", () => {
+    expect(
+      setLines(ex("Remo alto", 2, 2, { sets_: [set(1), set(2, { weight: 45, reps: 8 })] })),
+    ).toEqual(["set 1 · 40kg × 10 reps · 20:00", "set 2 · 45kg × 8 reps · 20:00"]);
+  });
+
+  it("leaves the weight out of a bodyweight set", () => {
+    expect(setLines(ex("Dominadas neutras", 1, 1, { sets_: [set(1, { weight: null, reps: 5 })] })))
+      .toEqual(["set 1 · 5 reps · 20:00"]);
+  });
+
+  it("keeps a machine's own unit", () => {
+    expect(
+      setLines(ex("Peck deck", 1, 1, { unit: "bricks", sets_: [set(1, { weight: 6, reps: 15 })] })),
+    ).toEqual(["set 1 · 6 bricks × 15 reps · 20:00"]);
+  });
+
+  it("shows a timed set in seconds", () => {
+    expect(
+      setLines(ex("Plancha", 1, 1, { sets_: [set(1, { weight: null, reps: null, timeSeconds: 45 })] })),
+    ).toEqual(["set 1 · 45s · 20:00"]);
+  });
+
+  it("keeps the real reps and marks the ones that hit the target", () => {
+    expect(setLines(ex("Remo alto", 1, 1, { sets_: [set(1, { hitTarget: true })] }))).toEqual([
+      "set 1 · 40kg × 10 reps · target hit · 20:00",
+    ]);
+  });
+
+  it("says a set he tapped skip on was skipped, not that it was work", () => {
+    expect(
+      setLines(ex("Remo alto", 1, 1, { sets_: [set(1, { skipped: true, hitTarget: true })] })),
+    ).toEqual(["set 1 · skipped · 20:00"]);
+  });
+
+  it("numbers a planned set he never reached, so you can see where he stopped", () => {
+    expect(setLines(ex("Remo alto", 3, 2, { sets_: [set(1), set(2)] }))).toEqual([
+      "set 1 · 40kg × 10 reps · 20:00",
+      "set 2 · 40kg × 10 reps · 20:00",
+      "set 3 · not logged",
+    ]);
+  });
+
+  it("still lists a set logged beyond the plan", () => {
+    expect(setLines(ex("Remo alto", 1, 2, { sets_: [set(1), set(2)] }))).toHaveLength(2);
+  });
+
+  it("keeps a row with no rep count as the zero it really is", () => {
+    expect(setLines(ex("Camilla de isquio", 1, 1, { sets_: [set(1, { weight: 15, reps: 0 })] })))
+      .toEqual(["set 1 · 15kg × 0 reps · 20:00"]);
+  });
+
+  it("puts the exercise's note last", () => {
+    expect(
+      setLines(ex("Sentadillas libres", 1, 1, { sets_: [set(1)], note: "Smith" })),
+    ).toEqual(["set 1 · 40kg × 10 reps · 20:00", "note: Smith"]);
   });
 });
 
@@ -278,13 +398,21 @@ describe("a day's block", () => {
       session({
         exercises: [
           ex("Dominadas neutras", 3, 0),
-          ex("Remo alto", 3, 3, { reps: 27, volume: 1957.5 }),
+          ex("Remo alto", 3, 3, {
+            reps: 27,
+            volume: 1957.5,
+            targetWeight: 45,
+            sets_: [set(1), set(2, { reps: 9 }), set(3, { reps: 8 })],
+          }),
         ],
       }),
     ]);
     expect(block).toBe(
-      "2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 262 · volume: 8,281kg · muscles: Espalda\n" +
-        "  - done: Remo alto · 3 sets · 27 reps · 1,958kg\n" +
+      "2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 262 · volume: 8,281kg · muscles: Espalda · ended: 21:55\n" +
+        "  - done: Remo alto · 3 sets · 27 reps · 1,958kg · target: 3 × 10 reps @ 45kg\n" +
+        "    - set 1 · 40kg × 10 reps · 20:00\n" +
+        "    - set 2 · 40kg × 9 reps · 20:00\n" +
+        "    - set 3 · 40kg × 8 reps · 20:00\n" +
         "  - skipped exercise: Dominadas neutras (3 sets)",
     );
   });
@@ -306,7 +434,9 @@ describe("a day's block", () => {
       planned: 10,
       reps: 100,
       volume: 2000,
-      exercises: [ex("Press plano", 10, 10, { reps: 100, volume: 2000 })],
+      exercises: [
+        ex("Press plano", 2, 2, { reps: 100, volume: 2000, sets_: [set(1), set(2)] }),
+      ],
     });
     const evening = session({
       day: "Day 3",
@@ -316,21 +446,33 @@ describe("a day's block", () => {
       planned: 8,
       reps: 60,
       volume: 450,
-      exercises: [ex("Vuelos laterales", 6, 6, { reps: 60, volume: 450 }), ex("Face pulls", 2, 0)],
+      exercises: [
+        ex("Vuelos laterales", 2, 2, { reps: 60, volume: 450, sets_: [set(1), set(2)] }),
+        ex("Face pulls", 2, 0),
+      ],
     });
     const lines = blockFor("2026-11-12", [morning, evening]).split("\n");
-    expect(lines[0]).toBe(
+    expect(lines).toEqual([
       "2026-11-12 · sessions: 2 · workout: Pequeño Putarraco · day: Day 1, Day 3 · at: 08:00 · duration: 70min · done: 89% · sets: 16/18 · reps: 160 · volume: 2,450kg · muscles: Pecho, Hombros",
-    );
-    expect(lines[1]).toBe(
-      "  - session 1 · workout: Pequeño Putarraco · day: Day 1 · at: 08:00 · duration: 30min · done: 100% · sets: 10/10 · reps: 100 · volume: 2,000kg · muscles: Pecho",
-    );
-    expect(lines[2]).toBe("  - done: Press plano · 10 sets · 100 reps · 2,000kg");
-    expect(lines[3]).toBe(
-      "  - session 2 · workout: Pequeño Putarraco · day: Day 3 · at: 20:00 · duration: 40min · done: 75% · sets: 6/8 · reps: 60 · volume: 450kg · muscles: Hombros",
-    );
-    expect(lines[4]).toBe("  - done: Vuelos laterales · 6 sets · 60 reps · 450kg");
-    expect(lines[5]).toBe("  - skipped exercise: Face pulls (2 sets)");
+      "  - session 1 · workout: Pequeño Putarraco · day: Day 1 · at: 08:00 · duration: 30min · done: 100% · sets: 10/10 · reps: 100 · volume: 2,000kg · muscles: Pecho · ended: 08:30",
+      "  - done: Press plano · 2 sets · 100 reps · 2,000kg · target: 2 × 10 reps",
+      "    - set 1 · 40kg × 10 reps · 20:00",
+      "    - set 2 · 40kg × 10 reps · 20:00",
+      "  - session 2 · workout: Pequeño Putarraco · day: Day 3 · at: 20:00 · duration: 40min · done: 75% · sets: 6/8 · reps: 60 · volume: 450kg · muscles: Hombros · ended: 20:40",
+      "  - done: Vuelos laterales · 2 sets · 60 reps · 450kg · target: 2 × 10 reps",
+      "    - set 1 · 40kg × 10 reps · 20:00",
+      "    - set 2 · 40kg × 10 reps · 20:00",
+      "  - skipped exercise: Face pulls (2 sets)",
+    ]);
+  });
+
+  it("indents a set under its exercise, two spaces then four", () => {
+    const block = blockFor("2026-11-12", [
+      session({ exercises: [ex("Remo alto", 1, 1, { sets_: [set(1)] })] }),
+    ]);
+    const [, exercise, oneSet] = block.split("\n");
+    expect(exercise.startsWith("  - ")).toBe(true);
+    expect(oneSet.startsWith("    - ")).toBe(true);
   });
 });
 

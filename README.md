@@ -86,12 +86,24 @@ A daily job writes one block per training day to `Gym-bro.md` in Martin's
 Google Drive folder *Life data*, where every app he uses writes its own file
 and a Claude session reads the folder to say how his week went.
 
+A summary line on top, then everything the app holds for that day underneath.
+
 ```
-2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 262 · volume: 8,280kg · muscles: Espalda, Triceps
-  - done: Remo alto · 3 sets · 27 reps · 1,958kg
+2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 262 · volume: 8,280kg · muscles: Espalda, Triceps · ended: 21:55
+  - done: Remo alto · 3 sets · 27 reps · 1,958kg · target: 3 × 10 reps @ 45kg
+    - set 1 · 72.5kg × 10 reps · 21:00
+    - set 2 · 72.5kg × 10 reps · 21:04
+    - set 3 · 72.5kg × 7 reps · 21:06
   - skipped exercise: Dominadas neutras (3 sets)
 ```
 
+A detail line starts with two spaces and `- `, a sub-detail with four — the
+format the whole *Life data* folder uses.
+
+- Every set is a row of `set_logs` as it stands: weight in the unit it was
+  logged in, the reps he actually did, `target hit` where the app saved that
+  flag, the minute it was logged, and `not logged` for a planned set he never
+  reached. Nothing is derived or guessed.
 - `scripts/lifedata.mjs` reads the day's rows and appends. Pure parts are
   unit-tested in `scripts/lifedata.test.mjs`; the database is only ever read,
   inside a `read only` transaction.
