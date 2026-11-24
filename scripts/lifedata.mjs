@@ -5,7 +5,7 @@
  * The folder holds one markdown file per app; a Claude session reads the folder
  * to say how his days went. This writes `Gym-bro.md`:
  *
- *   2026-11-12 · workout: … · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 212 · volume: 8,450kg · muscles: back, triceps
+ *   2026-11-12 · workout: … · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 212 · volume: 8,450kg · muscles: Espalda, Triceps
  *     - done: Remo alto · 3 sets · 30 reps · 1,350kg
  *     - skipped exercise: Dominadas neutras (3 sets)
  *
@@ -38,47 +38,6 @@ export const FOLDER_NAME = "Life data";
 /** Martin's day runs 04:00 to 03:59, so a 01:00 workout belongs to the day before. */
 export const DAY_STARTS_AT_HOUR = 4;
 
-/**
- * Which muscle each exercise trains. The exercises table has no muscle column,
- * so this is the map — one primary muscle per exercise, which keeps "most sets
- * first" a thing you can count. Nothing is guessed at run time: an exercise
- * that is not in here is named on the line as `unmapped:` so it gets noticed
- * and added, rather than quietly filed under the wrong muscle.
- */
-export const MUSCLES = {
-  // chest
-  "press plano": "chest",
-  "press plano c/mancuernas": "chest",
-  "flexiones de brazos": "chest",
-  "aperturas planas": "chest",
-  "empuje de pectoral": "chest",
-  "peck deck": "chest",
-  // back
-  "dominadas neutras": "back",
-  "remo alto": "back",
-  "dorsales al pecho (amplio)": "back",
-  "remo a 1 brazo (banco)": "back",
-  "pull over (lento)": "back",
-  // arms
-  "biceps alternado": "biceps",
-  "biceps barra recta": "biceps",
-  "biceps polea c/soga": "biceps",
-  "triceps tras nuca 1 brazo": "triceps",
-  "triceps pata de burro": "triceps",
-  "triceps polea c/barra angulo": "triceps",
-  // shoulders
-  "press hombros alternado": "shoulders",
-  "vuelos laterales": "shoulders",
-  "vuelos frontal con disco": "shoulders",
-  // legs
-  "sillon de cuadriceps 1 pierna": "quads",
-  "sillon de cuadriceps 2 piernas": "quads",
-  "sentadillas libres": "quads",
-  "camilla de isquio": "hamstrings",
-  "sillon de abductores (abrir)": "glutes",
-};
-
-export const muscleOf = (name) => MUSCLES[name.trim().toLowerCase().replace(/\s+/g, " ")] ?? null;
 
 const REPO = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -169,10 +128,18 @@ export const percent = (logged, planned) =>
 export const kg = (n) => `${Math.round(n ?? 0).toLocaleString("en-US")}kg`;
 
 /**
- * `muscles:` — what the session actually trained, the busiest first. Only sets
- * he logged count: an exercise he skipped trained nothing. Ties go to whichever
- * came first in the workout, so the same session always renders the same
- * string and a re-run has nothing to append.
+ * `muscles:` — what the session actually trained, the busiest first.
+ *
+ * The muscle is the divider he already writes above a group of exercises in
+ * the app ("PIERNAS", "HOMBROS"), stored on each exercise as `section_name`.
+ * It is his own word for the group, so nothing here guesses or translates.
+ * Only sets he logged count: an exercise he skipped trained nothing. Ties go
+ * to whichever came first in the workout, so the same session always renders
+ * the same string and a re-run has nothing to append.
+ *
+ * An exercise sitting under no divider can't be attributed to anything, so it
+ * is named on the line as `unmapped:` — a nudge to give it one, rather than a
+ * silent guess.
  */
 export function muscleFields(exercises) {
   const sets = new Map();
@@ -180,7 +147,7 @@ export function muscleFields(exercises) {
   const unmapped = [];
   exercises.forEach((e, i) => {
     if (e.logged <= 0) return;
-    const muscle = muscleOf(e.name);
+    const muscle = e.section?.trim();
     if (!muscle) {
       if (!unmapped.includes(e.name)) unmapped.push(e.name);
       return;
@@ -435,6 +402,7 @@ async function readDays(sql, dates) {
 
     const perExercise = await sql`
       select s.id as session_id, e.name, e.sets, e.weight_unit,
+             e.section_name,
              count(l.id)::int as logged,
              coalesce(sum(l.reps), 0)::int as reps,
              coalesce(sum(case when e.weight_unit = 'kg'
@@ -445,7 +413,7 @@ async function readDays(sql, dates) {
         left join set_logs l
           on l.session_id = s.id and l.exercise_id = e.id and l.skipped = false
        where s.id in ${sql(rows.map((r) => r.id))}
-       group by s.id, e.id, e.name, e.sets, e.weight_unit, e.position
+       group by s.id, e.id, e.name, e.sets, e.weight_unit, e.section_name, e.position
        order by s.id, e.position`;
 
     const byDate = new Map();
@@ -471,6 +439,7 @@ async function readDays(sql, dates) {
           .filter((e) => e.session_id === r.id)
           .map((e) => ({
             name: e.name,
+            section: e.section_name,
             sets: e.sets,
             logged: e.logged,
             reps: e.reps,

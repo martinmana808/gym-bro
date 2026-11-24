@@ -87,7 +87,7 @@ Google Drive folder *Life data*, where every app he uses writes its own file
 and a Claude session reads the folder to say how his week went.
 
 ```
-2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 262 · volume: 8,280kg · muscles: back, triceps
+2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26 · reps: 262 · volume: 8,280kg · muscles: Espalda, Triceps
   - done: Remo alto · 3 sets · 27 reps · 1,958kg
   - skipped exercise: Dominadas neutras (3 sets)
 ```
@@ -98,10 +98,10 @@ and a Claude session reads the folder to say how his week went.
 - `volume:` is kilos only, matching the History screen: a machine measured in
   bricks has no honest kilo figure, so those sets add nothing to the total and
   their own line carries the setting instead (`load: 6 bricks`).
-- `muscles:` comes from the `MUSCLES` map in the script, one primary muscle per
-  exercise, busiest first — the exercises table has no muscle column. Rename an
-  exercise and it shows up in the file as `unmapped: <name>` rather than being
-  guessed at; add it to the map.
+- `muscles:` is the divider above a group of exercises in the workout
+  (`exercises.section_name` — "PIERNAS", "HOMBROS"), busiest first. It is his
+  own word for the group, so nothing is translated or guessed. An exercise
+  under no divider shows up as `unmapped: <name>`; give it one.
 - A day runs 04:00–03:59 Buenos Aires, so a workout at 01:00 belongs to the
   day before. The job runs at **04:05**, writes yesterday, and re-checks the
   7 days before it — if a day's data has changed since, it appends a fresh
