@@ -78,6 +78,34 @@ sign-in is offered there.
 | `npm run db:generate` | Generate a new SQL migration after editing `src/db/schema.ts` |
 | `npm run db:migrate` | Apply migrations to `DATABASE_URL` (production) |
 | `npm run seed:demo` | Seed demo data into the local PGlite db |
+| `npm run lifedata -- --dry-run` | Print the Life data blocks for the last 8 closed days, writing nothing |
+
+## Life data
+
+A daily job writes one block per training day to `Gym-bro.md` in Martin's
+Google Drive folder *Life data*, where every app he uses writes its own file
+and a Claude session reads the folder to say how his week went.
+
+```
+2026-11-12 · workout: Pequeño Putarraco · day: Day 2 · at: 20:58 · duration: 57min · done: 88% · sets: 23/26
+  - skipped exercise: Dominadas neutras (3 sets)
+```
+
+- `scripts/lifedata.mjs` reads the day's rows and appends. Pure parts are
+  unit-tested in `scripts/lifedata.test.mjs`; the database is only ever read,
+  inside a `read only` transaction.
+- A day runs 04:00–03:59 Buenos Aires, so a workout at 01:00 belongs to the
+  day before. The job runs at **04:05**, writes yesterday, and re-checks the
+  7 days before it — if a day's data has changed since, it appends a fresh
+  block rather than editing the old one. The file is append-only; the last
+  block for a date is the true one.
+- `launchctl` job `com.martinmana.gym-bro.lifedata`, logging to
+  `~/Library/Logs/gym-bro-lifedata.log`. Drive for desktop syncs the file up,
+  so there is no Drive API and no credential.
+- The connection string lives in `.env.lifedata` as `LIFEDATA_DATABASE_URL`.
+  **Not** `DATABASE_URL`: `src/db/index.ts` switches to that Postgres the
+  moment the variable exists, and `npm run dev` would then be editing
+  production.
 
 ## How it's put together
 

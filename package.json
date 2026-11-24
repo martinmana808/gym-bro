@@ -10,7 +10,8 @@
     "test": "vitest run",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "seed:demo": "node scripts/seed-demo.mjs"
+    "seed:demo": "node scripts/seed-demo.mjs",
+    "lifedata": "node scripts/lifedata.mjs"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
